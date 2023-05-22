@@ -26,6 +26,7 @@ public enum RpcMethod {
   ADMIN_GENERATE_LOG_BLOOM_CACHE("admin_generateLogBloomCache"),
   ADMIN_LOGS_REPAIR_CACHE("admin_logsRepairCache"),
   ADMIN_LOGS_REMOVE_CACHE("admin_logsRemoveCache"),
+  ADMIN_CAPTURE_JAVA_CORE("admin_captureJavaCore"),
   CLIQUE_DISCARD("clique_discard"),
   CLIQUE_GET_SIGNERS("clique_getSigners"),
   CLIQUE_GET_SIGNERS_AT_HASH("clique_getSignersAtHash"),

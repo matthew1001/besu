@@ -18,6 +18,7 @@ import org.hyperledger.besu.config.GenesisConfigOptions;
 import org.hyperledger.besu.ethereum.api.jsonrpc.RpcApis;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.AdminAddPeer;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.AdminChangeLogLevel;
+import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.AdminCaptureJavaCore;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.AdminGenerateLogBloomCache;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.AdminLogsRemoveCache;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.AdminLogsRepairCache;
@@ -87,6 +88,7 @@ public class AdminJsonRpcMethods extends ApiGroupJsonRpcMethods {
         new AdminGenerateLogBloomCache(blockchainQueries),
         new AdminLogsRepairCache(blockchainQueries),
         new AdminLogsRemoveCache(blockchainQueries),
-        new PluginsReloadConfiguration(namedPlugins));
+        new PluginsReloadConfiguration(namedPlugins),
+        new AdminCaptureJavaCore());
   }
 }
