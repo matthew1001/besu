@@ -31,6 +31,7 @@ import java.util.Optional;
 public class MutableBftConfigOptions implements BftConfigOptions {
   private long epochLength;
   private int blockPeriodSeconds;
+  private int emptyBlockPeriodSeconds;
   private int requestTimeoutSeconds;
   private int gossipedHistoryLimit;
   private int messageQueueLimit;
@@ -43,6 +44,7 @@ public class MutableBftConfigOptions implements BftConfigOptions {
   public MutableBftConfigOptions(final BftConfigOptions bftConfigOptions) {
     this.epochLength = bftConfigOptions.getEpochLength();
     this.blockPeriodSeconds = bftConfigOptions.getBlockPeriodSeconds();
+    this.emptyBlockPeriodSeconds = bftConfigOptions.getEmptyBlockPeriodSeconds();
     this.requestTimeoutSeconds = bftConfigOptions.getRequestTimeoutSeconds();
     this.gossipedHistoryLimit = bftConfigOptions.getGossipedHistoryLimit();
     this.messageQueueLimit = bftConfigOptions.getMessageQueueLimit();
@@ -62,6 +64,12 @@ public class MutableBftConfigOptions implements BftConfigOptions {
   public int getBlockPeriodSeconds() {
     return blockPeriodSeconds;
   }
+
+  @Override
+  public int getEmptyBlockPeriodSeconds() {
+    return emptyBlockPeriodSeconds;
+  }
+
 
   @Override
   public int getRequestTimeoutSeconds() {

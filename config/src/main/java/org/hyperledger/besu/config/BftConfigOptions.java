@@ -26,6 +26,8 @@ public interface BftConfigOptions {
 
   int getBlockPeriodSeconds();
 
+  int getEmptyBlockPeriodSeconds();
+
   int getRequestTimeoutSeconds();
 
   int getGossipedHistoryLimit();
