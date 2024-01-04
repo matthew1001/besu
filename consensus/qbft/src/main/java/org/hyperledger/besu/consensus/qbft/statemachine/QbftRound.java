@@ -25,6 +25,7 @@ import org.hyperledger.besu.consensus.common.bft.BftExtraDataCodec;
 import org.hyperledger.besu.consensus.common.bft.BftHelpers;
 import org.hyperledger.besu.consensus.common.bft.ConsensusRoundIdentifier;
 import org.hyperledger.besu.consensus.common.bft.RoundTimer;
+import org.hyperledger.besu.consensus.common.bft.blockcreation.BftBlockCreator;
 import org.hyperledger.besu.consensus.common.bft.payload.SignedData;
 import org.hyperledger.besu.consensus.qbft.messagewrappers.Commit;
 import org.hyperledger.besu.consensus.qbft.messagewrappers.Prepare;
@@ -47,6 +48,7 @@ import org.hyperledger.besu.ethereum.mainnet.HeaderValidationMode;
 import org.hyperledger.besu.plugin.services.securitymodule.SecurityModuleException;
 import org.hyperledger.besu.util.Subscribers;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -127,7 +129,22 @@ public class QbftRound {
    */
   public void createAndSendProposalMessage(final long headerTimeStampSeconds) {
     LOG.debug("Creating proposed block. round={}", roundState.getRoundIdentifier());
-    final Block block = blockCreator.createBlock(headerTimeStampSeconds).getBlock();
+    final Block block;
+
+    if (this.protocolContext
+        .getConsensusContext(BftContext.class)
+        .getProtocolSchedule()
+        .anyMatch(p -> p.spec().getName().equalsIgnoreCase("shanghai"))) {
+      // shanghai onwards requires us to create blocks with a withdrawals list. It can/will be empty
+      // for QBFT but it needs to exist
+      block =
+          ((BftBlockCreator) blockCreator)
+              .createBlock(headerTimeStampSeconds, Optional.of(Collections.emptyList()))
+              .getBlock();
+    } else {
+      // Pre-shanghai (no withdrawals list in the block)
+      block = blockCreator.createBlock(headerTimeStampSeconds).getBlock();
+    }
 
     LOG.trace("Creating proposed block blockHeader={}", block.getHeader());
     updateStateWithProposalAndTransmit(block, emptyList(), emptyList());

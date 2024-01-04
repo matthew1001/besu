@@ -13,6 +13,7 @@
 - Set Ethereum Classic mainnet activation block for Spiral network upgrade [#6267](https://github.com/hyperledger/besu/pull/6267)
 - Add custom genesis file name to config overview if specified [#6297](https://github.com/hyperledger/besu/pull/6297)
 - Update Gradle plugins and replace unmaintained License Gradle Plugin with the actively maintained Gradle License Report [#6275](https://github.com/hyperledger/besu/pull/6275)
+- QBFT and IBFT chains now support the `shanghai` fork, allowing the use of compilers that use the `PUSH0` op-code [#1234](https://github.com/hyperledger/besu/pull/1234)
 
 ### Bug fixes
 

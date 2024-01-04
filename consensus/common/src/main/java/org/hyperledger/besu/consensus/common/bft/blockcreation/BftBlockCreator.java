@@ -26,10 +26,12 @@ import org.hyperledger.besu.ethereum.core.BlockHeader;
 import org.hyperledger.besu.ethereum.core.BlockHeaderBuilder;
 import org.hyperledger.besu.ethereum.core.MiningParameters;
 import org.hyperledger.besu.ethereum.core.SealableBlockHeader;
+import org.hyperledger.besu.ethereum.core.Withdrawal;
 import org.hyperledger.besu.ethereum.eth.manager.EthScheduler;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPool;
 import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
 
+import java.util.List;
 import java.util.Optional;
 
 /** The Bft block creator. */
@@ -75,6 +77,26 @@ public class BftBlockCreator extends AbstractBlockCreator {
         Optional.empty(),
         ethScheduler);
     this.bftExtraDataCodec = bftExtraDataCodec;
+  }
+
+  /**
+   * Create block and return block creation result.
+   *
+   * @param timestamp the timestamp
+   * @param withdrawals optional list of withdrawals
+   * @return the block creation result
+   */
+  public BlockCreationResult createBlock(
+      final long timestamp, final Optional<List<Withdrawal>> withdrawals) {
+
+    return createBlock(
+        Optional.empty(),
+        Optional.empty(),
+        withdrawals,
+        Optional.empty(),
+        Optional.empty(),
+        timestamp,
+        false);
   }
 
   private static MiningBeneficiaryCalculator miningBeneficiaryCalculator(

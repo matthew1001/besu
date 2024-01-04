@@ -19,6 +19,7 @@ import org.hyperledger.besu.consensus.common.bft.BftBlockInterface;
 import org.hyperledger.besu.consensus.common.bft.BftContext;
 import org.hyperledger.besu.consensus.common.validator.ValidatorProvider;
 import org.hyperledger.besu.consensus.qbft.pki.PkiBlockCreationConfiguration;
+import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
 
 import java.util.Optional;
 
@@ -33,14 +34,16 @@ public class QbftContext extends BftContext {
    * @param validatorProvider the validator provider
    * @param epochManager the epoch manager
    * @param blockInterface the block interface
+   * @param protocolSchedule the protocol schedule
    * @param pkiBlockCreationConfiguration the pki block creation configuration
    */
   public QbftContext(
       final ValidatorProvider validatorProvider,
       final EpochManager epochManager,
       final BftBlockInterface blockInterface,
+      final ProtocolSchedule protocolSchedule,
       final Optional<PkiBlockCreationConfiguration> pkiBlockCreationConfiguration) {
-    super(validatorProvider, epochManager, blockInterface);
+    super(validatorProvider, epochManager, blockInterface, protocolSchedule);
     this.pkiBlockCreationConfiguration = pkiBlockCreationConfiguration;
   }
 

@@ -306,7 +306,8 @@ public class IbftBesuControllerBuilder extends BftBesuControllerBuilder {
         BlockValidatorProvider.forkingValidatorProvider(
             blockchain, epochManager, bftBlockInterface().get(), validatorOverrides),
         epochManager,
-        bftBlockInterface().get());
+        bftBlockInterface().get(),
+        protocolSchedule);
   }
 
   private BftValidatorOverrides convertIbftForks(final List<BftFork> bftForks) {

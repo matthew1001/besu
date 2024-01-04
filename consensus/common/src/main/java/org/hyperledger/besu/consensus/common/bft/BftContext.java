@@ -18,6 +18,7 @@ import org.hyperledger.besu.consensus.common.EpochManager;
 import org.hyperledger.besu.consensus.common.PoaContext;
 import org.hyperledger.besu.consensus.common.validator.ValidatorProvider;
 import org.hyperledger.besu.ethereum.ConsensusContext;
+import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
 
 /** Holds the BFT specific mutable state. */
 public class BftContext implements PoaContext {
@@ -25,6 +26,7 @@ public class BftContext implements PoaContext {
   private final ValidatorProvider validatorProvider;
   private final EpochManager epochManager;
   private final BftBlockInterface blockInterface;
+  private final ProtocolSchedule protocolSchedule;
 
   /**
    * Instantiates a new Bft context.
@@ -32,14 +34,17 @@ public class BftContext implements PoaContext {
    * @param validatorProvider the validator provider
    * @param epochManager the epoch manager
    * @param blockInterface the block interface
+   * @param protocolSchedule the protocol schedule
    */
   public BftContext(
       final ValidatorProvider validatorProvider,
       final EpochManager epochManager,
-      final BftBlockInterface blockInterface) {
+      final BftBlockInterface blockInterface,
+      final ProtocolSchedule protocolSchedule) {
     this.validatorProvider = validatorProvider;
     this.epochManager = epochManager;
     this.blockInterface = blockInterface;
+    this.protocolSchedule = protocolSchedule;
   }
 
   /**
@@ -58,6 +63,15 @@ public class BftContext implements PoaContext {
    */
   public EpochManager getEpochManager() {
     return epochManager;
+  }
+
+  /**
+   * Gets the protocol schedule.
+   *
+   * @return the protocol schedule
+   */
+  public ProtocolSchedule getProtocolSchedule() {
+    return protocolSchedule;
   }
 
   @Override
