@@ -23,6 +23,7 @@ import org.hyperledger.besu.consensus.common.bft.BftExtraDataCodec;
 import org.hyperledger.besu.consensus.common.bft.BftHelpers;
 import org.hyperledger.besu.consensus.common.bft.ConsensusRoundIdentifier;
 import org.hyperledger.besu.consensus.common.bft.RoundTimer;
+import org.hyperledger.besu.consensus.common.bft.blockcreation.BftBlockCreator;
 import org.hyperledger.besu.consensus.ibft.messagewrappers.Commit;
 import org.hyperledger.besu.consensus.ibft.messagewrappers.Prepare;
 import org.hyperledger.besu.consensus.ibft.messagewrappers.Proposal;
@@ -40,9 +41,11 @@ import org.hyperledger.besu.ethereum.core.BlockHeader;
 import org.hyperledger.besu.ethereum.core.BlockImporter;
 import org.hyperledger.besu.ethereum.mainnet.BlockImportResult;
 import org.hyperledger.besu.ethereum.mainnet.HeaderValidationMode;
+import org.hyperledger.besu.ethereum.mainnet.ScheduledProtocolSpec;
 import org.hyperledger.besu.plugin.services.securitymodule.SecurityModuleException;
 import org.hyperledger.besu.util.Subscribers;
 
+import java.util.Collections;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -115,7 +118,28 @@ public class IbftRound {
    * @param headerTimeStampSeconds the header time stamp seconds
    */
   public void createAndSendProposalMessage(final long headerTimeStampSeconds) {
-    final Block block = blockCreator.createBlock(headerTimeStampSeconds).getBlock();
+    final Block block;
+
+    final Optional<ScheduledProtocolSpec.Hardfork> shanghaiFork =
+        this.protocolContext
+            .getConsensusContext(BftContext.class)
+            .getProtocolSchedule()
+            .hardforkFor(s -> s.fork().name().equalsIgnoreCase("shanghai"));
+
+    if (shanghaiFork.isPresent()
+        && (new ScheduledProtocolSpec.Hardfork("shanghai", headerTimeStampSeconds)
+                .compareTo(shanghaiFork.get())
+            >= 0)) {
+      // shanghai onwards requires us to create blocks with a withdrawals list. It can/will be empty
+      // for QBFT but it needs to exist
+      block =
+          ((BftBlockCreator) blockCreator)
+              .createBlock(headerTimeStampSeconds, Optional.of(Collections.emptyList()))
+              .getBlock();
+    } else {
+      // Pre-shanghai (no withdrawals list in the block)
+      block = blockCreator.createBlock(headerTimeStampSeconds).getBlock();
+    }
     final BftExtraData extraData = bftExtraDataCodec.decode(block.getHeader());
     LOG.debug("Creating proposed block. round={}", roundState.getRoundIdentifier());
     LOG.trace(

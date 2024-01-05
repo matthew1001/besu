@@ -81,7 +81,7 @@ public class MessageValidatorFactory {
   public MessageValidator createMessageValidator(
       final ConsensusRoundIdentifier roundIdentifier, final BlockHeader parentHeader) {
     final BlockValidator blockValidator =
-        protocolSchedule.getByBlockNumber(roundIdentifier.getSequenceNumber()).getBlockValidator();
+        protocolSchedule.getByBlockHeader(parentHeader).getBlockValidator();
     final Collection<Address> validators = getValidatorsAfterBlock(parentHeader);
 
     final BftBlockInterface bftBlockInterface =

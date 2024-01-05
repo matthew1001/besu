@@ -110,7 +110,7 @@ public class IbftRoundFactory {
         roundState,
         blockCreator,
         protocolContext,
-        protocolSchedule.getByBlockNumber(roundIdentifier.getSequenceNumber()).getBlockImporter(),
+        protocolSchedule.getByBlockHeader(parentHeader).getBlockImporter(),
         minedBlockObservers,
         finalState.getNodeKey(),
         messageFactory,

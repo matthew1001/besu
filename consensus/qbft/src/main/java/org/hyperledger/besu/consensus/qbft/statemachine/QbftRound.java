@@ -45,6 +45,7 @@ import org.hyperledger.besu.ethereum.core.BlockHeader;
 import org.hyperledger.besu.ethereum.core.BlockImporter;
 import org.hyperledger.besu.ethereum.mainnet.BlockImportResult;
 import org.hyperledger.besu.ethereum.mainnet.HeaderValidationMode;
+import org.hyperledger.besu.ethereum.mainnet.ScheduledProtocolSpec;
 import org.hyperledger.besu.plugin.services.securitymodule.SecurityModuleException;
 import org.hyperledger.besu.util.Subscribers;
 
@@ -131,10 +132,16 @@ public class QbftRound {
     LOG.debug("Creating proposed block. round={}", roundState.getRoundIdentifier());
     final Block block;
 
-    if (this.protocolContext
-        .getConsensusContext(BftContext.class)
-        .getProtocolSchedule()
-        .anyMatch(p -> p.spec().getName().equalsIgnoreCase("shanghai"))) {
+    final Optional<ScheduledProtocolSpec.Hardfork> shanghaiFork =
+        this.protocolContext
+            .getConsensusContext(BftContext.class)
+            .getProtocolSchedule()
+            .hardforkFor(s -> s.fork().name().equalsIgnoreCase("shanghai"));
+
+    if (shanghaiFork.isPresent()
+        && (new ScheduledProtocolSpec.Hardfork("shanghai", headerTimeStampSeconds)
+                .compareTo(shanghaiFork.get())
+            >= 0)) {
       // shanghai onwards requires us to create blocks with a withdrawals list. It can/will be empty
       // for QBFT but it needs to exist
       block =
