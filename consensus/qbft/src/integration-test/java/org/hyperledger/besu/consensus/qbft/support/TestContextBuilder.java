@@ -430,7 +430,12 @@ public class TestContextBuilder {
         new ProtocolContext(
             blockChain,
             worldStateArchive,
-            new QbftContext(validatorProvider, epochManager, blockInterface, Optional.empty()),
+            new QbftContext(
+                validatorProvider,
+                epochManager,
+                blockInterface,
+                protocolSchedule,
+                Optional.empty()),
             Optional.empty());
 
     final TransactionPoolConfiguration poolConf =

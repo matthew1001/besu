@@ -17,7 +17,7 @@ package org.hyperledger.besu.consensus.qbft.statemachine;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hyperledger.besu.consensus.common.bft.BftContextBuilder.setupContextWithBftExtraDataEncoder;
+import static org.hyperledger.besu.consensus.common.bft.BftContextBuilder.setupContextWithBftExtraDataEncoderWithSchedule;
 import static org.hyperledger.besu.consensus.common.bft.ConsensusRoundHelpers.createFrom;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -31,6 +31,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.hyperledger.besu.config.StubGenesisConfigOptions;
+import org.hyperledger.besu.consensus.common.ForksSchedule;
 import org.hyperledger.besu.consensus.common.bft.BftExtraData;
 import org.hyperledger.besu.consensus.common.bft.BftExtraDataCodec;
 import org.hyperledger.besu.consensus.common.bft.BlockTimer;
@@ -42,6 +44,7 @@ import org.hyperledger.besu.consensus.common.bft.network.ValidatorMulticaster;
 import org.hyperledger.besu.consensus.common.bft.statemachine.BftFinalState;
 import org.hyperledger.besu.consensus.qbft.QbftContext;
 import org.hyperledger.besu.consensus.qbft.QbftExtraDataCodec;
+import org.hyperledger.besu.consensus.qbft.QbftProtocolScheduleBuilder;
 import org.hyperledger.besu.consensus.qbft.messagedata.RoundChangeMessageData;
 import org.hyperledger.besu.consensus.qbft.messagewrappers.Commit;
 import org.hyperledger.besu.consensus.qbft.messagewrappers.Prepare;
@@ -65,9 +68,12 @@ import org.hyperledger.besu.ethereum.core.BlockBody;
 import org.hyperledger.besu.ethereum.core.BlockHeader;
 import org.hyperledger.besu.ethereum.core.BlockHeaderTestFixture;
 import org.hyperledger.besu.ethereum.core.BlockImporter;
+import org.hyperledger.besu.ethereum.core.PrivacyParameters;
 import org.hyperledger.besu.ethereum.core.Util;
 import org.hyperledger.besu.ethereum.mainnet.BlockImportResult;
+import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
 import org.hyperledger.besu.ethereum.p2p.rlpx.wire.MessageData;
+import org.hyperledger.besu.evm.internal.EvmConfiguration;
 import org.hyperledger.besu.util.Subscribers;
 
 import java.math.BigInteger;
@@ -155,12 +161,21 @@ public class QbftBlockHeightManagerTest {
     when(messageValidatorFactory.createMessageValidator(any(), any())).thenReturn(messageValidator);
     when(blockImporter.importBlock(any(), any(), any())).thenReturn(new BlockImportResult(false));
 
+    ProtocolSchedule qbftLondonSchedule =
+        QbftProtocolScheduleBuilder.create(
+            new StubGenesisConfigOptions().londonBlock(0).zeroBaseFee(true),
+            new ForksSchedule<>(List.of()),
+            PrivacyParameters.DEFAULT,
+            false,
+            bftExtraDataCodec,
+            EvmConfiguration.DEFAULT);
+
     protocolContext =
         new ProtocolContext(
             null,
             null,
-            setupContextWithBftExtraDataEncoder(
-                QbftContext.class, validators, new QbftExtraDataCodec()),
+            setupContextWithBftExtraDataEncoderWithSchedule(
+                QbftContext.class, validators, new QbftExtraDataCodec(), qbftLondonSchedule),
             Optional.empty());
 
     // Ensure the created QbftRound has the valid ConsensusRoundIdentifier;

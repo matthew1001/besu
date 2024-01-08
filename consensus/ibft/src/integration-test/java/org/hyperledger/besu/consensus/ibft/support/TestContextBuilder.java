@@ -343,7 +343,7 @@ public class TestContextBuilder {
         new ProtocolContext(
             blockChain,
             worldStateArchive,
-            new BftContext(validatorProvider, epochManager, blockInterface),
+            new BftContext(validatorProvider, epochManager, blockInterface, protocolSchedule),
             Optional.empty());
     final TransactionPoolConfiguration poolConf =
         ImmutableTransactionPoolConfiguration.builder().txPoolMaxSize(1).build();

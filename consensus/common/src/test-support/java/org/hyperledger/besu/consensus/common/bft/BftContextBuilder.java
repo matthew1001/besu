@@ -21,6 +21,7 @@ import static org.mockito.Mockito.withSettings;
 
 import org.hyperledger.besu.consensus.common.validator.ValidatorProvider;
 import org.hyperledger.besu.datatypes.Address;
+import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
 
 import java.util.Collection;
 
@@ -28,7 +29,8 @@ import org.mockito.quality.Strictness;
 
 public class BftContextBuilder {
 
-  public static BftContext setupContextWithValidators(final Collection<Address> validators) {
+  public static BftContext setupContextWithValidatorsWithSchedule(
+      final Collection<Address> validators, final ProtocolSchedule protocolSchedule) {
     final BftContext bftContext =
         mock(BftContext.class, withSettings().strictness(Strictness.LENIENT));
     final ValidatorProvider mockValidatorProvider =
@@ -39,7 +41,16 @@ public class BftContextBuilder {
     when(mockValidatorProvider.getValidatorsAfterBlock(any())).thenReturn(validators);
     when(bftContext.getBlockInterface()).thenReturn(mockBftBlockInterface);
     when(bftContext.as(any())).thenReturn(bftContext);
+
+    if (protocolSchedule != null) {
+      when(bftContext.getProtocolSchedule()).thenReturn(protocolSchedule);
+    }
+
     return bftContext;
+  }
+
+  public static BftContext setupContextWithValidators(final Collection<Address> validators) {
+    return setupContextWithValidatorsWithSchedule(validators, null);
   }
 
   public static BftContext setupContextWithBftExtraData(
@@ -69,10 +80,20 @@ public class BftContextBuilder {
     return setupContextWithBftExtraDataEncoder(BftContext.class, validators, bftExtraDataCodec);
   }
 
-  public static <T extends BftContext> T setupContextWithBftExtraDataEncoder(
+  public static BftContext setupContextWithBftExtraDataEncoderWithSchedule(
+      final Collection<Address> validators,
+      final BftExtraDataCodec bftExtraDataCodec,
+      final ProtocolSchedule protocolSchedule) {
+    return setupContextWithBftExtraDataEncoderWithSchedule(
+        BftContext.class, validators, bftExtraDataCodec, protocolSchedule);
+  }
+
+  public static <T extends BftContext> T setupContextWithBftExtraDataEncoderWithSchedule(
       final Class<T> contextClazz,
       final Collection<Address> validators,
-      final BftExtraDataCodec bftExtraDataCodec) {
+      final BftExtraDataCodec bftExtraDataCodec,
+      final ProtocolSchedule protocolSchedule) {
+
     final T bftContext = mock(contextClazz, withSettings().strictness(Strictness.LENIENT));
     final ValidatorProvider mockValidatorProvider =
         mock(ValidatorProvider.class, withSettings().strictness(Strictness.LENIENT));
@@ -81,6 +102,19 @@ public class BftContextBuilder {
     when(bftContext.getBlockInterface()).thenReturn(new BftBlockInterface(bftExtraDataCodec));
     when(bftContext.as(any())).thenReturn(bftContext);
 
+    if (protocolSchedule != null) {
+      when(bftContext.getProtocolSchedule()).thenReturn(protocolSchedule);
+    }
+
     return bftContext;
+  }
+
+  public static <T extends BftContext> T setupContextWithBftExtraDataEncoder(
+      final Class<T> contextClazz,
+      final Collection<Address> validators,
+      final BftExtraDataCodec bftExtraDataCodec) {
+
+    return setupContextWithBftExtraDataEncoderWithSchedule(
+        contextClazz, validators, bftExtraDataCodec, null);
   }
 }
