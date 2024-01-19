@@ -556,6 +556,7 @@ public class BesuNode implements NodeConfiguration, RunnableNode, AutoCloseable 
   private void loadPortsFile() {
     try (final FileInputStream fis =
         new FileInputStream(new File(homeDirectory.toFile(), "besu.ports"))) {
+      System.out.println("MRW: Loading ports from " + new File(homeDirectory.toFile(), "besu.ports").getPath());
       portsProperties.load(fis);
       LOG.info("Ports for node {}: {}", name, portsProperties);
     } catch (final IOException e) {
@@ -797,11 +798,15 @@ public class BesuNode implements NodeConfiguration, RunnableNode, AutoCloseable 
 
   @Override
   public Optional<String> getGenesisConfig() {
+    //System.out.println("MRW: Getting genesis config: " + genesisConfig);
     return genesisConfig;
   }
 
   @Override
   public void setGenesisConfig(final String config) {
+    //System.out.println("MRW: Setting genesis config. Was:    " + genesisConfig);
+    //System.out.println("MRW: Setting genesis config. Is now: " + config);
+    //new Exception().printStackTrace();
     this.genesisConfig = Optional.of(config);
   }
 
