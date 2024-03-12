@@ -135,6 +135,9 @@ public class RlpxAgent {
           new IllegalStateException("Illegal attempt to stop " + getClass().getSimpleName()));
     }
 
+    streamConnections().forEach((conn) -> {
+      System.out.println("MRW: Disconnecting client " + conn.getRemoteEnode().toURI());
+    });
     streamConnections().forEach((conn) -> conn.disconnect(DisconnectReason.CLIENT_QUITTING));
     return connectionInitializer.stop();
   }

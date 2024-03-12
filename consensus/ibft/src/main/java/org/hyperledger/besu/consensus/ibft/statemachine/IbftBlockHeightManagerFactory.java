@@ -19,9 +19,13 @@ import org.hyperledger.besu.consensus.common.bft.statemachine.BftFinalState;
 import org.hyperledger.besu.consensus.ibft.payload.MessageFactory;
 import org.hyperledger.besu.consensus.ibft.validation.MessageValidatorFactory;
 import org.hyperledger.besu.ethereum.core.BlockHeader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The Ibft block height manager factory. */
 public class IbftBlockHeightManagerFactory {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IbftBlockHeightManagerFactory.class);
 
   private final IbftRoundFactory roundFactory;
   private final BftFinalState finalState;
@@ -55,8 +59,10 @@ public class IbftBlockHeightManagerFactory {
    */
   public BaseIbftBlockHeightManager create(final BlockHeader parentHeader) {
     if (finalState.isLocalNodeValidator()) {
+      LOG.debug("Local node is a validator");
       return createFullBlockHeightManager(parentHeader);
     } else {
+      LOG.debug("Local node is a validator");
       return createNoOpBlockHeightManager(parentHeader);
     }
   }
