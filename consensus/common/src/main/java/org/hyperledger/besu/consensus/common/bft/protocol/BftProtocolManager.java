@@ -35,7 +35,6 @@ import org.slf4j.LoggerFactory;
 
 /** The Bft protocol manager. */
 public class BftProtocolManager implements ProtocolManager {
-  private static final Logger LOG = LoggerFactory.getLogger(BftProtocolManager.class);
 
   private final BftEventQueue bftEventQueue;
   private final PeerConnectionTracker peers;
@@ -97,7 +96,9 @@ public class BftProtocolManager implements ProtocolManager {
     final MessageData messageData = message.getData();
     final int code = messageData.getCode();
     final Address address = message.getConnection().getPeerInfo().getAddress();
-    LOG.trace("Process message {}, {}, from = {}", cap, code, address);
+    if (code < 0 && address.isEmpty()) {
+      System.out.println("ERR");
+    }
 
     final BftEvent messageEvent = BftEvents.fromMessage(message);
     bftEventQueue.add(messageEvent);

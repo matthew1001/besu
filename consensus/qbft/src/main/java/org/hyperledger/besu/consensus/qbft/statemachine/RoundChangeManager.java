@@ -76,6 +76,7 @@ public class RoundChangeManager {
      * @return the boolean
      */
     public boolean roundChangeReady() {
+      System.out.println("Is a round change ready? We've received " + receivedMessages.size() + " messages and need " + quorum);
       return receivedMessages.size() >= quorum && !actioned;
     }
 
@@ -111,7 +112,8 @@ public class RoundChangeManager {
    */
   public RoundChangeManager(
       final long quorum, final RoundChangeMessageValidator roundChangeMessageValidator) {
-    this.quorum = quorum;
+    //this.quorum = quorum;
+    this.quorum = 2;
     this.roundChangeMessageValidator = roundChangeMessageValidator;
   }
 
@@ -144,6 +146,8 @@ public class RoundChangeManager {
 
   private RoundChangeStatus storeRoundChangeMessage(final RoundChange msg) {
     final ConsensusRoundIdentifier msgTargetRound = msg.getRoundIdentifier();
+
+    System.out.println("Quorum for a round-change is " + quorum);
 
     final RoundChangeStatus roundChangeStatus =
         roundChangeCache.computeIfAbsent(msgTargetRound, ignored -> new RoundChangeStatus(quorum));

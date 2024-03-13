@@ -86,8 +86,6 @@ public abstract class BaseBftController implements BftEventHandler {
     if (!duplicateMessageTracker.hasSeenMessage(data)) {
       duplicateMessageTracker.addSeenMessage(data);
       handleMessage(msg.getMessage());
-    } else {
-      LOG.trace("Discarded duplicate message");
     }
   }
 
