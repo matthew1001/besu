@@ -27,13 +27,19 @@ import org.hyperledger.besu.consensus.qbft.messagedata.PrepareMessageData;
 import org.hyperledger.besu.consensus.qbft.messagedata.ProposalMessageData;
 import org.hyperledger.besu.consensus.qbft.messagedata.QbftV1;
 import org.hyperledger.besu.consensus.qbft.messagedata.RoundChangeMessageData;
+import org.hyperledger.besu.consensus.qbft.network.QbftMessageTransmitter;
 import org.hyperledger.besu.ethereum.chain.Blockchain;
 import org.hyperledger.besu.ethereum.core.BlockHeader;
 import org.hyperledger.besu.ethereum.p2p.rlpx.wire.Message;
 import org.hyperledger.besu.ethereum.p2p.rlpx.wire.MessageData;
+import org.hyperledger.besu.ethereum.rlp.RLPException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The Qbft controller. */
 public class QbftController extends BaseBftController {
+
+  private static final Logger LOG = LoggerFactory.getLogger(BaseBftController.class);
 
   private BaseQbftBlockHeightManager currentHeightManager;
   private final QbftBlockHeightManagerFactory qbftBlockHeightManagerFactory;
@@ -78,10 +84,14 @@ public class QbftController extends BaseBftController {
 
     switch (messageData.getCode()) {
       case QbftV1.PROPOSAL:
-        consumeMessage(
-            message,
-            ProposalMessageData.fromMessageData(messageData).decode(bftExtraDataCodec),
-            currentHeightManager::handleProposalPayload);
+        try {
+          consumeMessage(
+                  message,
+                  ProposalMessageData.fromMessageData(messageData).decode(bftExtraDataCodec),
+                  currentHeightManager::handleProposalPayload);
+        } catch (RLPException e) {
+          LOG.warn("Bad proposal message received. Ignoring");
+        }
         break;
 
       case QbftV1.PREPARE:

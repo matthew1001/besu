@@ -17,6 +17,7 @@ package org.hyperledger.besu.consensus.qbft.messagewrappers;
 import org.hyperledger.besu.consensus.common.bft.BftExtraDataCodec;
 import org.hyperledger.besu.consensus.common.bft.messagewrappers.BftMessage;
 import org.hyperledger.besu.consensus.common.bft.payload.SignedData;
+import org.hyperledger.besu.consensus.qbft.messagedata.ProposalMessageData;
 import org.hyperledger.besu.consensus.qbft.payload.PreparePayload;
 import org.hyperledger.besu.consensus.qbft.payload.ProposalPayload;
 import org.hyperledger.besu.consensus.qbft.payload.RoundChangePayload;
@@ -87,10 +88,16 @@ public class Proposal extends BftMessage<ProposalPayload> {
     rlpOut.startList();
     rlpOut.writeList(roundChanges, SignedData::writeTo);
     rlpOut.writeList(prepares, SignedData::writeTo);
+    if (System.getenv("BADVALIDATOR") != null) {
+      System.out.println("******* Proposing a bad block ********");
+      rlpOut.writeByte((byte)'4');
+    }
     rlpOut.endList();
 
     rlpOut.endList();
-    return rlpOut.encoded();
+    Bytes result = rlpOut.encoded();
+    result.reverse();
+    return result;
   }
 
   /**
