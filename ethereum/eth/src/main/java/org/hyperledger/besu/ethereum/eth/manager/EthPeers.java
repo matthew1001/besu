@@ -153,37 +153,40 @@ public class EthPeers {
       EthPeer haEthPeer = completeHAConnections.get(id);
       if (ethPeer == null) {
         final Optional<EthPeer> peerInList =
-                incompleteConnections.asMap().values().stream()
-                        .filter(p -> p.getId().equals(id))
-                        .findFirst();
+            incompleteConnections.asMap().values().stream()
+                .filter(p -> p.getId().equals(id))
+                .findFirst();
         ethPeer =
-                peerInList.orElse(
-                        new EthPeer(
-                                newConnection,
-                                protocolName,
-                                this::ethPeerStatusExchanged,
-                                peerValidators,
-                                maxMessageSize,
-                                clock,
-                                permissioningProviders,
-                                localNodeId));
+            peerInList.orElse(
+                new EthPeer(
+                    newConnection,
+                    protocolName,
+                    this::ethPeerStatusExchanged,
+                    peerValidators,
+                    maxMessageSize,
+                    clock,
+                    permissioningProviders,
+                    localNodeId));
       } else if (haEthPeer == null) {
-        if (!newConnection.getRemoteEnode().toURI().equals(ethPeer.getConnection().getRemoteEnode().toURI())) {
+        if (!newConnection
+            .getRemoteEnode()
+            .toURI()
+            .equals(ethPeer.getConnection().getRemoteEnode().toURI())) {
           final Optional<EthPeer> peerInList =
-                  incompleteConnections.asMap().values().stream()
-                          .filter(p -> p.getId().equals(id))
-                          .findFirst();
+              incompleteConnections.asMap().values().stream()
+                  .filter(p -> p.getId().equals(id))
+                  .findFirst();
           ethPeer =
-                  peerInList.orElse(
-                          new EthPeer(
-                                  newConnection,
-                                  protocolName,
-                                  this::ethPeerStatusExchanged,
-                                  peerValidators,
-                                  maxMessageSize,
-                                  clock,
-                                  permissioningProviders,
-                                  localNodeId));
+              peerInList.orElse(
+                  new EthPeer(
+                      newConnection,
+                      protocolName,
+                      this::ethPeerStatusExchanged,
+                      peerValidators,
+                      maxMessageSize,
+                      clock,
+                      permissioningProviders,
+                      localNodeId));
         }
       }
       incompleteConnections.put(newConnection, ethPeer);
@@ -238,8 +241,21 @@ public class EthPeers {
   }
 
   public EthPeer peer(final PeerConnection connection) {
-    final EthPeer ethPeer = incompleteConnections.getIfPresent(connection);
-    return ethPeer != null ? ethPeer : completeConnections.get(connection.getPeer().getId());
+    EthPeer matchedPeer = null;
+    final EthPeer ethPeerIncomplete = incompleteConnections.getIfPresent(connection);
+    final EthPeer ethPeerComplete = completeConnections.get(connection.getPeer().getId());
+    final EthPeer ethPeerHAComplete = completeHAConnections.get(connection.getPeer().getId());
+    if (ethPeerIncomplete != null && ethPeerIncomplete.getConnection().getRemoteEnode().toURI().toString().equals(connection.getPeer().getEnodeURL().toURI().toString())) {
+      // System.out.println("MRW: Best peer - incomplete peer");
+      matchedPeer = ethPeerIncomplete;
+    } else if (ethPeerComplete != null && ethPeerComplete.getConnection().getRemoteEnode().toURI().toString().equals(connection.getPeer().getEnodeURL().toURI().toString())) {
+      // System.out.println("MRW: Best peer - primary peer");
+      matchedPeer = ethPeerComplete;
+    } else if (ethPeerHAComplete != null && ethPeerHAComplete.getConnection().getRemoteEnode().toURI().toString().equals(connection.getPeer().getEnodeURL().toURI().toString())) {
+      // System.out.println("MRW: Best peer - secondary peer");
+      matchedPeer = ethPeerHAComplete;
+    }
+    return matchedPeer;
   }
 
   public PendingPeerRequest executePeerRequest(
@@ -310,7 +326,8 @@ public class EthPeers {
   }
 
   public Stream<EthPeer> streamAllPeers() {
-    return Stream.concat(completeConnections.values().stream(), completeHAConnections.values().stream());
+    return Stream.concat(
+        completeConnections.values().stream(), completeHAConnections.values().stream());
   }
 
   private void removeDisconnectedPeers() {
@@ -323,13 +340,13 @@ public class EthPeers {
               }
             });
     completeHAConnections
-            .values()
-            .forEach(
-                    ep -> {
-                      if (ep.isDisconnected()) {
-                        registerDisconnect(ep.getId(), ep, ep.getConnection());
-                      }
-                    });
+        .values()
+        .forEach(
+            ep -> {
+              if (ep.isDisconnected()) {
+                registerDisconnect(ep.getId(), ep, ep.getConnection());
+              }
+            });
   }
 
   public Stream<EthPeer> streamAvailablePeers() {
@@ -371,9 +388,11 @@ public class EthPeers {
   }
 
   public Stream<PeerConnection> getAllActiveConnections() {
-    return Stream.concat(completeConnections.values().stream()
-        .map(EthPeer::getConnection)
-        .filter(c -> !c.isDisconnected()), completeHAConnections.values().stream()
+    return Stream.concat(
+        completeConnections.values().stream()
+            .map(EthPeer::getConnection)
+            .filter(c -> !c.isDisconnected()),
+        completeHAConnections.values().stream()
             .map(EthPeer::getConnection)
             .filter(c -> !c.isDisconnected()));
   }
@@ -381,8 +400,9 @@ public class EthPeers {
   public Stream<PeerConnection> getAllConnections() {
     return Stream.concat(
             completeConnections.values().stream().map(EthPeer::getConnection),
-            Stream.concat(completeHAConnections.values().stream().map(EthPeer::getConnection),
-            incompleteConnections.asMap().keySet().stream()))
+            Stream.concat(
+                completeHAConnections.values().stream().map(EthPeer::getConnection),
+                incompleteConnections.asMap().keySet().stream()))
         .distinct()
         .filter(c -> !c.isDisconnected());
   }
@@ -606,7 +626,10 @@ public class EthPeers {
       } else if (canAddSecondaryPeer) {
         added = (completeHAConnections.putIfAbsent(id, peer) == null);
         if (added) {
-          LOG.info("Added secondary peer {} with connection {} to completeHAConnections", id, connection);
+          LOG.info(
+              "Added secondary peer {} with connection {} to completeHAConnections",
+              id,
+              connection);
         }
       }
       if (added && canAddPrimaryPeer) {
@@ -614,7 +637,10 @@ public class EthPeers {
       } else if (added && canAddSecondaryPeer) {
         LOG.trace("Added peer {} with connection {} to completeHAConnections", id, connection);
       } else {
-        LOG.trace("Did not add peer {} with connection {} to completeConnections or completeHAConnections", id, connection);
+        LOG.trace(
+            "Did not add peer {} with connection {} to completeConnections or completeHAConnections",
+            id,
+            connection);
       }
       return added;
     } else {
