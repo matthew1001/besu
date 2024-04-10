@@ -100,7 +100,7 @@ public class RoundStateTest {
             .createProposal(
                 roundIdentifier, block, Collections.emptyList(), Collections.emptyList());
 
-    assertThat(roundState.setProposedBlock(proposal)).isFalse();
+    assertThat(roundState.setProposedBlock(proposal, null)).isFalse();
     assertThat(roundState.isPrepared()).isFalse();
     assertThat(roundState.isCommitted()).isFalse();
     assertThat(roundState.constructPreparedCertificate()).isEmpty();
@@ -119,7 +119,7 @@ public class RoundStateTest {
             .createProposal(
                 roundIdentifier, block, Collections.emptyList(), Collections.emptyList());
 
-    assertThat(roundState.setProposedBlock(proposal)).isTrue();
+    assertThat(roundState.setProposedBlock(proposal, null)).isTrue();
     assertThat(roundState.isPrepared()).isFalse();
     assertThat(roundState.isCommitted()).isFalse();
 
@@ -175,7 +175,7 @@ public class RoundStateTest {
             .get(0)
             .createProposal(
                 roundIdentifier, block, Collections.emptyList(), Collections.emptyList());
-    assertThat(roundState.setProposedBlock(proposal)).isTrue();
+    assertThat(roundState.setProposedBlock(proposal, null)).isTrue();
     assertThat(roundState.isPrepared()).isTrue();
     assertThat(roundState.isCommitted()).isFalse();
     assertThat(roundState.constructPreparedCertificate()).isNotEmpty();
@@ -207,7 +207,7 @@ public class RoundStateTest {
             .createProposal(
                 roundIdentifier, block, Collections.emptyList(), Collections.emptyList());
 
-    assertThat(roundState.setProposedBlock(proposal)).isTrue();
+    assertThat(roundState.setProposedBlock(proposal, null)).isTrue();
     assertThat(roundState.isPrepared()).isFalse();
     assertThat(roundState.isCommitted()).isFalse();
     assertThat(roundState.constructPreparedCertificate()).isEmpty();
@@ -237,7 +237,7 @@ public class RoundStateTest {
     when(messageValidator.validatePrepare(secondPrepare)).thenReturn(true);
     when(messageValidator.validatePrepare(thirdPrepare)).thenReturn(true);
 
-    roundState.setProposedBlock(proposal);
+    roundState.setProposedBlock(proposal, null);
     assertThat(roundState.isPrepared()).isFalse();
 
     roundState.addPrepareMessage(firstPrepare);
@@ -283,7 +283,7 @@ public class RoundStateTest {
             .createProposal(
                 roundIdentifier, block, Collections.emptyList(), Collections.emptyList());
 
-    roundState.setProposedBlock(proposal);
+    roundState.setProposedBlock(proposal, null);
     roundState.addCommitMessage(firstCommit);
     assertThat(roundState.isCommitted()).isFalse();
     roundState.addCommitMessage(secondCommit);
@@ -315,7 +315,7 @@ public class RoundStateTest {
     when(messageValidator.validateProposal(any())).thenReturn(true);
     when(messageValidator.validatePrepare(any())).thenReturn(true);
 
-    roundState.setProposedBlock(proposal);
+    roundState.setProposedBlock(proposal, null);
     roundState.addPrepareMessage(firstPrepare);
     roundState.addPrepareMessage(secondPrepare);
     roundState.addPrepareMessage(duplicatePrepare);

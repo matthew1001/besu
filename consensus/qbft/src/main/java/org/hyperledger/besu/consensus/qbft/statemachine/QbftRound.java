@@ -35,6 +35,7 @@ import org.hyperledger.besu.consensus.qbft.payload.PreparePayload;
 import org.hyperledger.besu.consensus.qbft.payload.RoundChangePayload;
 import org.hyperledger.besu.crypto.SECPSignature;
 import org.hyperledger.besu.cryptoservices.NodeKey;
+import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.datatypes.Hash;
 import org.hyperledger.besu.ethereum.ProtocolContext;
 import org.hyperledger.besu.ethereum.blockcreation.BlockCreator;
@@ -262,7 +263,9 @@ public class QbftRound {
   private boolean updateStateWithProposedBlock(final Proposal msg) {
     final boolean wasPrepared = roundState.isPrepared();
     final boolean wasCommitted = roundState.isCommitted();
-    final boolean blockAccepted = roundState.setProposedBlock(msg);
+    final boolean blockAccepted =
+        roundState.setProposedBlock(
+            msg, Address.extract(this.nodeKey.getPublicKey()).addressHash());
 
     if (blockAccepted) {
       final Block block = roundState.getProposedBlock().get();

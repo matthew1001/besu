@@ -20,6 +20,7 @@ import org.hyperledger.besu.consensus.qbft.messagewrappers.Prepare;
 import org.hyperledger.besu.consensus.qbft.messagewrappers.Proposal;
 import org.hyperledger.besu.consensus.qbft.validation.MessageValidator;
 import org.hyperledger.besu.crypto.SECPSignature;
+import org.hyperledger.besu.datatypes.Hash;
 import org.hyperledger.besu.ethereum.core.Block;
 
 import java.util.Collection;
@@ -79,12 +80,22 @@ public class RoundState {
    * Sets proposed block.
    *
    * @param msg the Proposal payload msg
+   * @param nodeHash the optional hash of the node to skip block validation for our own blocks
    * @return the proposed block
    */
-  public boolean setProposedBlock(final Proposal msg) {
-
+  public boolean setProposedBlock(final Proposal msg, final Hash nodeHash) {
     if (!proposalMessage.isPresent()) {
-      if (validator.validateProposal(msg)) {
+      boolean validProposal = false;
+      if (nodeHash != null && nodeHash.equals(msg.getAuthor().addressHash())) {
+        // Assume it's valid - we made it
+        validProposal = validator.validateProposalLite(msg);
+        LOG.info("Setting the proposed block. We created it so we're assuming it's valid and going straight to the next step");
+      } else {
+        // Someone else made it - check their working
+        validProposal = validator.validateProposal(msg);
+        LOG.info("Setting the proposed block. We didn't create it so we need to validate it");
+      }
+      if (validProposal) {
         proposalMessage = Optional.of(msg);
         prepareMessages.removeIf(p -> !validator.validatePrepare(p));
         commitMessages.removeIf(p -> !validator.validateCommit(p));

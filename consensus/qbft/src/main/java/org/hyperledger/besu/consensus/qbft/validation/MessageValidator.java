@@ -133,10 +133,23 @@ public class MessageValidator {
     final boolean result = proposalValidator.validate(msg);
     if (result) {
       subsequentMessageValidator =
-          Optional.of(subsequentMessageValidatorFactory.create(msg.getBlock()));
+              Optional.of(subsequentMessageValidatorFactory.create(msg.getBlock()));
     }
 
     return result;
+  }
+
+  /**
+   * Validate proposal payload.
+   *
+   * @param msg the Proposal payload msg
+   * @return the boolean
+   */
+  public boolean validateProposalLite(final Proposal msg) {
+      subsequentMessageValidator =
+              Optional.of(subsequentMessageValidatorFactory.create(msg.getBlock()));
+
+    return true;
   }
 
   /**

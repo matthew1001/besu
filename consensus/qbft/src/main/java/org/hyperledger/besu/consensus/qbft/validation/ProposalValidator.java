@@ -94,11 +94,11 @@ public class ProposalValidator {
    */
   public boolean validate(final Proposal msg) {
     final BlockValidator blockValidator =
-        protocolSchedule.getByBlockHeader(msg.getBlock().getHeader()).getBlockValidator();
+            protocolSchedule.getByBlockHeader(msg.getBlock().getHeader()).getBlockValidator();
 
     final ProposalPayloadValidator payloadValidator =
-        new ProposalPayloadValidator(
-            expectedProposer, roundIdentifier, blockValidator, protocolContext, bftExtraDataCodec);
+            new ProposalPayloadValidator(
+                    expectedProposer, roundIdentifier, blockValidator, protocolContext, bftExtraDataCodec);
 
     if (!payloadValidator.validate(msg.getSignedPayload())) {
       LOG.info("{}: invalid proposal payload in proposal message", ERROR_PREFIX);
