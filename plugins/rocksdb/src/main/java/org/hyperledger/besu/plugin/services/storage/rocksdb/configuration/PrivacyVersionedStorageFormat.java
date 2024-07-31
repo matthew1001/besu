@@ -68,7 +68,7 @@ public enum PrivacyVersionedStorageFormat implements VersionedStorageFormat {
           configuration.getReceiptCompactionEnabled()
               ? FOREST_WITH_RECEIPT_COMPACTION
               : FOREST_WITH_VARIABLES;
-      case BONSAI ->
+      case BONSAI, BONSAI_ARCHIVE ->
           configuration.getReceiptCompactionEnabled()
               ? BONSAI_WITH_RECEIPT_COMPACTION
               : BONSAI_WITH_VARIABLES;
