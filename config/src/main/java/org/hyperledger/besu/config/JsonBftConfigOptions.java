@@ -35,6 +35,8 @@ public class JsonBftConfigOptions implements BftConfigOptions {
   private static final long DEFAULT_EPOCH_LENGTH = 30_000;
   private static final int DEFAULT_BLOCK_PERIOD_SECONDS = 1;
   private static final int DEFAULT_BLOCK_PERIOD_MILLISECONDS = 0; // Experimental for test only
+  // 0 keeps working as before, increase to activate it
+  private static final int DEFAULT_EMPTY_BLOCK_PERIOD_SECONDS = 0;
   private static final int DEFAULT_ROUND_EXPIRY_SECONDS = 1;
   // In a healthy network this can be very small. This default limit will allow for suitable
   // protection for on a typical 20 node validator network with multiple rounds
@@ -71,6 +73,12 @@ public class JsonBftConfigOptions implements BftConfigOptions {
   public long getBlockPeriodMilliseconds() {
     return JsonUtil.getLong(
         bftConfigRoot, "xblockperiodmilliseconds", DEFAULT_BLOCK_PERIOD_MILLISECONDS);
+  }
+
+  @Override
+  public int getEmptyBlockPeriodSeconds() {
+    return JsonUtil.getInt(
+        bftConfigRoot, "emptyblockperiodseconds", DEFAULT_EMPTY_BLOCK_PERIOD_SECONDS);
   }
 
   @Override
@@ -142,6 +150,9 @@ public class JsonBftConfigOptions implements BftConfigOptions {
     }
     if (bftConfigRoot.has("xblockperiodmilliseconds")) {
       builder.put("xBlockPeriodMilliSeconds", getBlockPeriodMilliseconds());
+    }
+    if (bftConfigRoot.has("emptyblockperiodseconds")) {
+      builder.put("emptyblockperiodseconds", getEmptyBlockPeriodSeconds());
     }
     if (bftConfigRoot.has("requesttimeoutseconds")) {
       builder.put("requestTimeoutSeconds", getRequestTimeoutSeconds());

@@ -32,6 +32,7 @@ public class MutableBftConfigOptions implements BftConfigOptions {
   private long epochLength;
   private int blockPeriodSeconds;
   private long blockPeriodMilliseconds;
+  private int emptyBlockPeriodSeconds;
   private int requestTimeoutSeconds;
   private int gossipedHistoryLimit;
   private int messageQueueLimit;
@@ -50,6 +51,7 @@ public class MutableBftConfigOptions implements BftConfigOptions {
     this.epochLength = bftConfigOptions.getEpochLength();
     this.blockPeriodSeconds = bftConfigOptions.getBlockPeriodSeconds();
     this.blockPeriodMilliseconds = bftConfigOptions.getBlockPeriodMilliseconds();
+    this.emptyBlockPeriodSeconds = bftConfigOptions.getEmptyBlockPeriodSeconds();
     this.requestTimeoutSeconds = bftConfigOptions.getRequestTimeoutSeconds();
     this.gossipedHistoryLimit = bftConfigOptions.getGossipedHistoryLimit();
     this.messageQueueLimit = bftConfigOptions.getMessageQueueLimit();
@@ -73,6 +75,11 @@ public class MutableBftConfigOptions implements BftConfigOptions {
   @Override
   public long getBlockPeriodMilliseconds() {
     return blockPeriodMilliseconds;
+  }
+
+  @Override
+  public int getEmptyBlockPeriodSeconds() {
+    return emptyBlockPeriodSeconds;
   }
 
   @Override
@@ -146,6 +153,15 @@ public class MutableBftConfigOptions implements BftConfigOptions {
    */
   public void setBlockPeriodMilliseconds(final long blockPeriodMilliseconds) {
     this.blockPeriodMilliseconds = blockPeriodMilliseconds;
+  }
+
+  /**
+   * Sets empty block period seconds.
+   *
+   * @param emptyBlockPeriodSeconds the empty block period seconds
+   */
+  public void setEmptyBlockPeriodSeconds(final int emptyBlockPeriodSeconds) {
+    this.emptyBlockPeriodSeconds = emptyBlockPeriodSeconds;
   }
 
   /**
