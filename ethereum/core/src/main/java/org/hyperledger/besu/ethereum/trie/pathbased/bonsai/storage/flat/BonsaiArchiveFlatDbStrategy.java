@@ -143,11 +143,14 @@ public class BonsaiArchiveFlatDbStrategy extends BonsaiFullFlatDbStrategy {
               .getNearestBefore(ACCOUNT_INFO_STATE_ARCHIVE, keyNearest)
               .filter(found -> accountHash.commonPrefixLength(found.key()) >= accountHash.size());
 
-      if (accountFound.isPresent()) {
+      if (nearestAccount.isPresent()) {
+        accountFound = null; // MRW TODO
+        // nearestAccount.flatMap(SegmentedKeyValueStorage.NearestKeyValue::wrapBytes);
         getAccountFromArchiveCounter.inc();
       } else {
         getAccountNotFoundInFlatDatabaseCounter.inc();
       }
+      accountFound = null; // MRW TODO
     } else {
 
       accountFound = nearestAccount;

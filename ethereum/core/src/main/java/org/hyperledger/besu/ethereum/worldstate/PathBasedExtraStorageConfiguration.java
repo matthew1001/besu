@@ -90,5 +90,15 @@ public interface PathBasedExtraStorageConfiguration {
     default boolean getCodeStoredByCodeHashEnabled() {
       return DEFAULT_CODE_USING_CODE_HASH_ENABLED;
     }
+
+    @Value.Default
+    default boolean isParallelTxProcessingEnabled() {
+      return DEFAULT_PARALLEL_TX_PROCESSING;
+    }
+
+    @Value.Default
+    default Long getArchiveTrieNodeCheckpointInterval() {
+      return DEFAULT_ARCHIVE_CHECKPOINT_INTERVAL;
+    }
   }
 }
