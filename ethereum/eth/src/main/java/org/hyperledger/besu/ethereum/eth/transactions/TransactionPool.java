@@ -334,6 +334,10 @@ public class TransactionPool implements BlockAddedObserver {
     pendingTransactionsListenersProxy.onDroppedListeners.unsubscribe(id);
   }
 
+  public TransactionPoolConfiguration getConfiguration() {
+    return configuration;
+  }
+
   @Override
   public void onBlockAdded(final BlockAddedEvent event) {
     if (isPoolEnabled.get()) {

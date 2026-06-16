@@ -94,6 +94,7 @@ public interface TransactionPoolConfiguration {
   Percentage DEFAULT_BLOB_PRICE_BUMP = Percentage.fromInt(100);
   Wei DEFAULT_RPC_TX_FEE_CAP = Wei.fromEth(1);
   boolean DEFAULT_NO_LOCAL_PRIORITY = false;
+  boolean DEFAULT_NO_LATE_FUND = false;
   boolean DEFAULT_ENABLE_SAVE_RESTORE = false;
   File DEFAULT_SAVE_FILE = new File(DEFAULT_SAVE_FILE_NAME);
   // 50 MB expressed in decimal bytes (50 * 10^6), not 50 MiB
@@ -153,6 +154,11 @@ public interface TransactionPoolConfiguration {
   @Value.Default
   default Boolean getNoLocalPriority() {
     return DEFAULT_NO_LOCAL_PRIORITY;
+  }
+
+  @Value.Default
+  default Boolean getNoLateFund() {
+    return DEFAULT_NO_LATE_FUND;
   }
 
   @Value.Default

@@ -18,7 +18,11 @@
 ### Bug fixes
 
 ### Additions and Improvements
-- `--api-gas-price-blocks` fixed to treat `0` as "sample zero blocks" [#10642](https://github.com/besu-eth/besu/pull/10642)
+- `--api-gas-price-blocks` now accepts `0` to disable block sampling for `eth_gasPrice` and
+  `eth_maxPriorityFeePerGas`. When set to `0`, `eth_gasPrice` returns the protocol minimum
+  (max of `--min-gas-price` and the next block base fee) and `eth_maxPriorityFeePerGas` returns
+  the value of `--min-priority-fee` (default `0`), making it straightforward to configure private
+  networks where priority fees are always zero.
 
 ## 26.6.1
 
