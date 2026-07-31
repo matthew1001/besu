@@ -95,8 +95,8 @@ public class RoundTimer {
   /**
    * Starts a timer for the supplied round that expires after an explicit delay, cancelling any
    * previously active round timer. This is used to defer the round-0 expiry until the empty-block
-   * period has elapsed, so that validators do not treat a proposer that is legitimately waiting
-   * out the empty-block window as having failed and trigger an unnecessary round change.
+   * period has elapsed, so that validators do not treat a proposer that is legitimately waiting out
+   * the empty-block window as having failed and trigger an unnecessary round change.
    *
    * @param round The round identifier which this timer is tracking
    * @param delayMillis The delay, in milliseconds, before the round expires. Negative values are
