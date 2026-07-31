@@ -93,10 +93,6 @@ public interface TransactionPoolConfiguration {
   Percentage DEFAULT_PRICE_BUMP = Percentage.fromInt(10);
   Percentage DEFAULT_BLOB_PRICE_BUMP = Percentage.fromInt(100);
   Wei DEFAULT_RPC_TX_FEE_CAP = Wei.fromEth(1);
-  // Defaults to the maximum representable value, i.e. no cap, so P2P transaction admission is
-  // unchanged unless an operator opts in. Note that a value of 0 does NOT disable capping: it caps
-  // fees to 0 (rejecting any transaction with a positive gas price), consistent with the RPC fee
-  // cap.
   Wei DEFAULT_P2P_TX_FEE_CAP = Wei.MAX_WEI;
   boolean DEFAULT_NO_LOCAL_PRIORITY = false;
   boolean DEFAULT_ENABLE_SAVE_RESTORE = false;
