@@ -225,8 +225,8 @@ public class TransactionPoolOptionsTest
   }
 
   @Test
-  public void p2pTxFeeCapDefaultsToOneEth() {
-    internalTestSuccess(config -> assertThat(config.getP2pTxFeeCap()).isEqualTo(Wei.fromEth(1)));
+  public void p2pTxFeeCapDefaultsToMaxWei() {
+    internalTestSuccess(config -> assertThat(config.getP2pTxFeeCap()).isEqualTo(Wei.MAX_WEI));
   }
 
   @Test

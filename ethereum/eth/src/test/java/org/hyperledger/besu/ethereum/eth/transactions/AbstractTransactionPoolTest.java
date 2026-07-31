@@ -574,12 +574,10 @@ public abstract class AbstractTransactionPoolTest extends AbstractTransactionPoo
     final Transaction remoteTransaction = createTransaction(0, twoEthers.add(1));
     final Set<Address> prioritySenders =
         hasPriority ? Set.of(remoteTransaction.getSender()) : Set.of();
-    // the RPC fee cap (txFeeCap) must not gate remote txs; keep the P2P cap high enough to admit
-    // this transaction so we isolate that behaviour
+    // the RPC fee cap (txFeeCap) must not gate remote txs; the P2P cap is uncapped by default so it
+    // does not interfere here
     transactionPool =
-        createTransactionPool(
-            b ->
-                b.txFeeCap(twoEthers).p2pTxFeeCap(Wei.fromEth(3)).prioritySenders(prioritySenders));
+        createTransactionPool(b -> b.txFeeCap(twoEthers).prioritySenders(prioritySenders));
 
     givenTransactionIsValid(remoteTransaction);
 
@@ -605,6 +603,18 @@ public abstract class AbstractTransactionPoolTest extends AbstractTransactionPoo
     transactionPool = createTransactionPool(b -> b.p2pTxFeeCap(twoEthers));
 
     final Transaction remoteTransaction = createTransaction(0, twoEthers);
+
+    givenTransactionIsValid(remoteTransaction);
+
+    addAndAssertRemoteTransactionsValid(remoteTransaction);
+  }
+
+  @Test
+  public void shouldAcceptRemoteTransactionWithVeryHighFeeByDefault() {
+    // the default P2P fee cap is Wei.MAX_WEI, so admission is effectively uncapped
+    transactionPool = createTransactionPool();
+
+    final Transaction remoteTransaction = createTransaction(0, Wei.fromEth(1_000_000));
 
     givenTransactionIsValid(remoteTransaction);
 
