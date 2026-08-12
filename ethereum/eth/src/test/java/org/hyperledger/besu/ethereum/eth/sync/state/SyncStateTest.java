@@ -793,14 +793,6 @@ public class SyncStateTest {
     assertThat(statuses.get(2).get().getCurrentBlock()).isEqualTo(100);
   }
 
-  /**
-   * Notifying subscribers while holding this object's monitor makes every callback run with
-   * SyncState locked, which deadlocks against anything the callback waits on that in turn needs
-   * SyncState. {@link SyncState#checkInSync()} is exactly that: the blockchain observer registered
-   * in the constructor calls it inline on whichever thread appended the block, so a consensus
-   * engine that stops its block-producing thread from inside a sync-status callback wedges both
-   * threads.
-   */
   @Test
   public void syncStatusListenersAreNotNotifiedWhileHoldingTheMonitor() {
     final List<Boolean> heldLockDuringCallback = new ArrayList<>();
@@ -813,11 +805,6 @@ public class SyncStateTest {
     assertThat(heldLockDuringCallback).hasSize(3).containsOnly(false);
   }
 
-  /**
-   * The other half of the contract: releasing our own monitor for the callbacks must not cost
-   * ordered delivery. One target change is delivered to every subscriber before the next begins,
-   * even when publishers race.
-   */
   @Test
   public void syncTargetNotificationsAreDeliveredOneAtATime() throws Exception {
     final AtomicInteger concurrentCallbacks = new AtomicInteger();

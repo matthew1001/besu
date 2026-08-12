@@ -22,7 +22,7 @@
 - `--rpc-tx-feecap` will treat a value of 0 as limiting fees to 0. Today it treats 0 as "do not cap fees". To achieve similar behaviour set it to a suitably large value to effectively prevent any fee capping.
 
 ### Bug fixes
-- Fixed a deadlock that could permanently wedge a BFT validator, leaving it stuck behind its peers with consensus and chain download both halted. `SyncState` no longer holds its own monitor while notifying sync-status subscribers.
+- Fixed a deadlock that can hang a BFT validator with consensus and chain download halted. [#10031](https://github.com/besu-eth/besu/pull/11031)
 - Restore structured `{peers, sync}` detail in plugin-based `/readiness` responses via `HealthCheckProvider` [#10687](https://github.com/besu-eth/besu/issues/10687)
 - Fixed `debug_traceTransaction`/`debug_traceCall`/`debug_traceBlock` returning an invalid empty-string `returnValue` and a phantom `STOP` entry in `structLogs` for legacy EOA-to-EOA transfers that execute no EVM code. Now returns `returnValue:"0x"` and empty `structLogs`, matching the execution-apis opcode-tracer schema. [#10972](https://github.com/besu-eth/besu/pull/10972)
 - Honor `callTracer`'s `onlyTopCall` tracer config in `debug_traceTransaction`/`debug_traceCall`/`debug_traceBlock`; the option was previously accepted but ignored, so responses always included the nested `calls` array. [#10967](https://github.com/besu-eth/besu/pull/10967)

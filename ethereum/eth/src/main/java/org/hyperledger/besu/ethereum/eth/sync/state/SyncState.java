@@ -44,8 +44,7 @@ public class SyncState implements NewPayloadListener {
   private final Blockchain blockchain;
   private final EthPeers ethPeers;
 
-  // Held while delivering sync-target notifications, so they stay totally ordered without holding
-  // this object's monitor across subscriber callbacks. See replaceSyncTarget().
+  // Held while delivering sync-target notifications without holding this object's monitor
   private final Object notificationLock = new Object();
 
   private final AtomicLong inSyncSubscriberId = new AtomicLong();
@@ -252,29 +251,9 @@ public class SyncState implements NewPayloadListener {
   }
 
   /**
-   * Swaps the sync target and notifies listeners.
-   *
-   * <p>Two locks, deliberately. The swap itself takes this object's monitor, which {@link
-   * #checkInSync()} also needs; notifications are then delivered under {@code notificationLock}
-   * instead, with our own monitor released.
-   *
-   * <p>Delivering them under our own monitor is what wedged QBFT validators: a subscriber that
-   * waits on another thread, while that thread is inside a block import whose block-added observers
-   * call the synchronized {@code checkInSync()} inline, deadlocks. The publisher holds the monitor
-   * the importing thread needs, and waits for it. Nothing sync-related recovers, because the
-   * chain-download loop is the blocked publisher and can no longer set or clear a sync target.
-   *
-   * <p>{@code notificationLock} keeps notification order total -- one target change is fully
-   * delivered to every subscriber, trackers included, before the next begins -- without holding the
-   * monitor a subscriber's callback might transitively need. The cycle is broken because the two
-   * locks are always taken in the same direction: notificationLock, then this. Which means
-   * subscribers must not mutate the sync target from an {@link Synchronizer.InSyncListener} -- that
-   * runs holding this monitor and would want notificationLock, inverting the order. Nothing does
-   * today.
-   *
-   * <p>Note this serialises publishers: a subscriber that blocks in its callback stalls other
-   * threads changing the sync target. That is a latency coupling, not a deadlock, and it is the
-   * price of ordered delivery on the caller's thread.
+   * Swaps the sync target and notifies listeners using two locks - the object monitor during the swap,
+   * and a separate notification lock while notifications are delivered. The release of the object
+   * monitor allows a block import (which also takes the monitor) to proceed, avoiding deadlock situations.
    */
   private void replaceSyncTarget(final Optional<SyncTarget> newTarget) {
     synchronized (notificationLock) {
