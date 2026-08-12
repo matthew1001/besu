@@ -44,6 +44,10 @@ public class SyncState implements NewPayloadListener {
   private final Blockchain blockchain;
   private final EthPeers ethPeers;
 
+  // Held while delivering sync-target notifications, so they stay totally ordered without holding
+  // this object's monitor across subscriber callbacks. See replaceSyncTarget().
+  private final Object notificationLock = new Object();
+
   private final AtomicLong inSyncSubscriberId = new AtomicLong();
   private final Map<Long, InSyncTracker> inSyncTrackers = new ConcurrentHashMap<>();
   private final Subscribers<SyncStatusListener> syncStatusListeners = Subscribers.create();
@@ -250,34 +254,48 @@ public class SyncState implements NewPayloadListener {
   /**
    * Swaps the sync target and notifies listeners.
    *
-   * <p>The target swap is done under the monitor, but listeners are notified outside it. Notifying
-   * while holding it makes every subscriber's callback run with this object locked, which deadlocks
-   * against anything the callback waits on that in turn needs SyncState -- notably {@link
-   * #checkInSync()}, which the blockchain observer registered in our constructor calls inline on
-   * whichever thread appended the block. A consensus engine that stops its block-producing thread
-   * from inside a sync-status callback closes exactly that cycle.
+   * <p>Two locks, deliberately. The swap itself takes this object's monitor, which {@link
+   * #checkInSync()} also needs; notifications are then delivered under {@code notificationLock}
+   * instead, with our own monitor released.
    *
-   * <p>Publishing outside the lock means callbacks are no longer serialised against each other, so
-   * subscribers must not assume notifications arrive in order; they should reconcile against the
-   * state they read rather than treating each event as a delta.
+   * <p>Delivering them under our own monitor is what wedged QBFT validators: a subscriber that
+   * waits on another thread, while that thread is inside a block import whose block-added observers
+   * call the synchronized {@code checkInSync()} inline, deadlocks. The publisher holds the monitor
+   * the importing thread needs, and waits for it. Nothing sync-related recovers, because the
+   * chain-download loop can no longer set or clear a sync target.
+   *
+   * <p>{@code notificationLock} keeps notification order total -- one target change is fully
+   * delivered to every subscriber, trackers included, before the next begins -- without holding the
+   * monitor a subscriber's callback might transitively need. The cycle is broken because the two
+   * locks are always taken in the same direction: notificationLock, then this. Which means
+   * subscribers must not mutate the sync target from an {@link Synchronizer.InSyncListener} -- that
+   * runs holding this monitor and would want notificationLock, inverting the order. Nothing does
+   * today.
+   *
+   * <p>Note this serialises publishers: a subscriber that blocks in its callback stalls other
+   * threads changing the sync target. That is a latency coupling, not a deadlock, and it is the
+   * price of ordered delivery on the caller's thread.
    */
   private void replaceSyncTarget(final Optional<SyncTarget> newTarget) {
-    synchronized (this) {
-      if (syncTarget.equals(newTarget)) {
-        // Nothing to do
-        return;
+    synchronized (notificationLock) {
+      synchronized (this) {
+        if (syncTarget.equals(newTarget)) {
+          // Nothing to do
+          return;
+        }
+        syncTarget.ifPresent(this::removeEstimatedHeightListener);
+        syncTarget = newTarget;
+        newTarget.ifPresent(this::addEstimatedHeightListener);
       }
-      syncTarget.ifPresent(this::removeEstimatedHeightListener);
-      syncTarget = newTarget;
-      newTarget.ifPresent(this::addEstimatedHeightListener);
-    }
-    // syncStatusListeners is created without suppressCallbackExceptions, so a throwing subscriber
-    // propagates out of here to our caller. The in-sync trackers must still be updated regardless,
-    // or one bad subscriber silently strands every other consumer of sync state.
-    try {
-      publishSyncStatus(newTarget);
-    } finally {
-      checkInSync();
+      // syncStatusListeners is created without suppressCallbackExceptions, so a throwing subscriber
+      // propagates out of here to our caller. The in-sync trackers must still be updated
+      // regardless,
+      // or one bad subscriber silently strands every other consumer of sync state.
+      try {
+        publishSyncStatus(newTarget);
+      } finally {
+        checkInSync();
+      }
     }
   }
 

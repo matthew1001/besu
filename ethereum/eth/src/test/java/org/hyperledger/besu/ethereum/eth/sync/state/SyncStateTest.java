@@ -60,6 +60,8 @@ import org.hyperledger.besu.plugin.services.BesuEvents.TTDReachedListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -810,6 +812,56 @@ public class SyncStateTest {
     syncState.setSyncProgress(0, 10, 100);
 
     assertThat(heldLockDuringCallback).hasSize(3).containsOnly(false);
+  }
+
+  /**
+   * The other half of the contract: releasing our own monitor for the callbacks must not cost
+   * ordered delivery. One target change is delivered to every subscriber before the next begins,
+   * even when publishers race.
+   */
+  @Test
+  public void syncTargetNotificationsAreDeliveredOneAtATime() throws Exception {
+    final AtomicInteger concurrentCallbacks = new AtomicInteger();
+    final AtomicInteger maxConcurrentCallbacks = new AtomicInteger();
+    final AtomicReference<Throwable> failure = new AtomicReference<>();
+
+    syncState.subscribeSyncStatus(
+        _ -> {
+          maxConcurrentCallbacks.accumulateAndGet(concurrentCallbacks.incrementAndGet(), Math::max);
+          try {
+            // Widen the window a racing publisher would have to slip into.
+            Thread.sleep(2);
+          } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+          } finally {
+            concurrentCallbacks.decrementAndGet();
+          }
+        });
+
+    final BlockHeader commonAncestor = blockchain.getBlockHeader(3L).get();
+    final Runnable flipTargetRepeatedly =
+        () -> {
+          try {
+            for (int i = 0; i < 25; i++) {
+              syncState.setSyncTarget(syncTargetPeer.getEthPeer(), commonAncestor);
+              syncState.clearSyncTarget();
+            }
+          } catch (final Throwable t) {
+            failure.compareAndSet(null, t);
+          }
+        };
+
+    final Thread first = new Thread(flipTargetRepeatedly, "publisher-1");
+    final Thread second = new Thread(flipTargetRepeatedly, "publisher-2");
+    first.start();
+    second.start();
+    first.join();
+    second.join();
+
+    assertThat(failure.get()).isNull();
+    assertThat(maxConcurrentCallbacks)
+        .withFailMessage("sync-status callbacks overlapped: notifications are no longer ordered")
+        .hasValue(1);
   }
 
   /**

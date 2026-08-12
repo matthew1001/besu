@@ -1104,7 +1104,7 @@ This is a hotfix to address publishing besu maven artifacts.  There are no issue
   - Some JVM metrics have changed name to adhere to the OTEL standard (see the table below), [Besu Full Grafana dashboard](https://grafana.com/grafana/dashboards/16455-besu-full/) is updated to support both names
 
     | Old Name                        | New Name                        |
-        |---------------------------------|---------------------------------|
+            |---------------------------------|---------------------------------|
     | jvm_memory_bytes_committed      | jvm_memory_committed_bytes      |
     | jvm_memory_bytes_init           | jvm_memory_init_bytes           |
     | jvm_memory_bytes_max            | jvm_memory_max_bytes            |
