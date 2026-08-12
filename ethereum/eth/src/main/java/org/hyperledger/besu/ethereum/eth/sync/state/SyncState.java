@@ -251,9 +251,10 @@ public class SyncState implements NewPayloadListener {
   }
 
   /**
-   * Swaps the sync target and notifies listeners using two locks - the object monitor during the swap,
-   * and a separate notification lock while notifications are delivered. The release of the object
-   * monitor allows a block import (which also takes the monitor) to proceed, avoiding deadlock situations.
+   * Swaps the sync target and notifies listeners using two locks - the object monitor during the
+   * swap, and a separate notification lock while notifications are delivered. The release of the
+   * object monitor allows a block import (which also takes the monitor) to proceed, avoiding
+   * deadlock situations.
    */
   private void replaceSyncTarget(final Optional<SyncTarget> newTarget) {
     synchronized (notificationLock) {
