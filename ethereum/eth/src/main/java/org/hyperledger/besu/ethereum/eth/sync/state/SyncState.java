@@ -247,16 +247,38 @@ public class SyncState implements NewPayloadListener {
     replaceSyncTarget(Optional.empty());
   }
 
-  private synchronized void replaceSyncTarget(final Optional<SyncTarget> newTarget) {
-    if (syncTarget.equals(newTarget)) {
-      // Nothing to do
-      return;
+  /**
+   * Swaps the sync target and notifies listeners.
+   *
+   * <p>The target swap is done under the monitor, but listeners are notified outside it. Notifying
+   * while holding it makes every subscriber's callback run with this object locked, which deadlocks
+   * against anything the callback waits on that in turn needs SyncState -- notably {@link
+   * #checkInSync()}, which the blockchain observer registered in our constructor calls inline on
+   * whichever thread appended the block. A consensus engine that stops its block-producing thread
+   * from inside a sync-status callback closes exactly that cycle.
+   *
+   * <p>Publishing outside the lock means callbacks are no longer serialised against each other, so
+   * subscribers must not assume notifications arrive in order; they should reconcile against the
+   * state they read rather than treating each event as a delta.
+   */
+  private void replaceSyncTarget(final Optional<SyncTarget> newTarget) {
+    synchronized (this) {
+      if (syncTarget.equals(newTarget)) {
+        // Nothing to do
+        return;
+      }
+      syncTarget.ifPresent(this::removeEstimatedHeightListener);
+      syncTarget = newTarget;
+      newTarget.ifPresent(this::addEstimatedHeightListener);
     }
-    syncTarget.ifPresent(this::removeEstimatedHeightListener);
-    syncTarget = newTarget;
-    newTarget.ifPresent(this::addEstimatedHeightListener);
-    publishSyncStatus(newTarget);
-    checkInSync();
+    // syncStatusListeners is created without suppressCallbackExceptions, so a throwing subscriber
+    // propagates out of here to our caller. The in-sync trackers must still be updated regardless,
+    // or one bad subscriber silently strands every other consumer of sync state.
+    try {
+      publishSyncStatus(newTarget);
+    } finally {
+      checkInSync();
+    }
   }
 
   private void publishSyncStatus(final Optional<SyncTarget> newTarget) {

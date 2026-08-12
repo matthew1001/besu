@@ -30,10 +30,17 @@ import org.hyperledger.besu.ethereum.core.Transaction;
 import org.hyperledger.besu.ethereum.eth.sync.state.SyncState;
 import org.hyperledger.besu.plugin.services.BesuEvents;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +64,9 @@ public class BftMiningCoordinator implements MiningCoordinator, BlockAddedObserv
   // that some other, unrelated observer could legitimately hold.
   private static final long NOT_REGISTERED = -1;
 
+  /** How long {@link #awaitStop()} waits for an in-flight sync-state transition to finish. */
+  private static final Duration TRANSITION_SHUTDOWN_TIMEOUT = Duration.ofSeconds(30);
+
   private static final Logger LOG = LoggerFactory.getLogger(BftMiningCoordinator.class);
 
   private final BftEventHandler eventHandler;
@@ -71,6 +81,13 @@ public class BftMiningCoordinator implements MiningCoordinator, BlockAddedObserv
 
   private volatile long blockAddedObserverId = NOT_REGISTERED;
   private final AtomicReference<State> state = new AtomicReference<>(State.UNINITIALIZED);
+
+  // The sync-state driven lifecycle. Sync-status notifications only record the state the
+  // coordinator *should* be in and hand off to transitionExecutor; see subscribe().
+  private final AtomicBoolean desiredMining = new AtomicBoolean(false);
+  private final AtomicReference<String> transitionReason = new AtomicReference<>("");
+  private volatile ExecutorService transitionExecutor;
+  private volatile boolean shuttingDown = false;
 
   private SyncState syncState;
 
@@ -131,6 +148,10 @@ public class BftMiningCoordinator implements MiningCoordinator, BlockAddedObserv
 
   @Override
   public void start() {
+    // Record the intent as well as acting on it, so a transition still queued on
+    // transitionExecutor from an earlier sync-status change cannot undo a direct caller. Runner
+    // calls stop() immediately before awaitStop() during shutdown, which is the case that matters.
+    desiredMining.set(true);
     if (state.compareAndSet(State.IDLE, State.RUNNING)
         || state.compareAndSet(State.STOPPED, State.RUNNING)) {
       bftProcessor.start();
@@ -143,6 +164,9 @@ public class BftMiningCoordinator implements MiningCoordinator, BlockAddedObserv
 
   @Override
   public void stop() {
+    // See start(): record the intent so a queued transition cannot restart us behind the caller's
+    // back.
+    desiredMining.set(false);
     // Stop from RUNNING, PAUSED, or IDLE: the merge transition watcher calls disable()
     // (RUNNING -> PAUSED) immediately before stop(), and disable()/enable() never actually
     // touch the processor/executors themselves (they only flip this state), so a coordinator
@@ -191,26 +215,42 @@ public class BftMiningCoordinator implements MiningCoordinator, BlockAddedObserv
     if (syncState == null) {
       return;
     }
-    syncState.subscribeSyncStatus(
-        _ -> {
-          if (syncState.syncTarget().isPresent() || !syncState.isInitialSyncPhaseDone()) {
-            // We're syncing so stop doing other stuff
-            LOG.info("Stopping BFT mining coordinator while we are syncing");
-            stop();
-          } else {
-            LOG.info("Starting BFT mining coordinator following sync");
-            enable();
-            start();
-          }
-        });
+
+    // Lifecycle transitions run on a dedicated single thread rather than on the thread that
+    // published the sync-status change. Two reasons, both of which have caused validators to
+    // wedge until restarted:
+    //
+    //  1. SyncState invokes its listeners while holding its own monitor, and stop() blocks in
+    //     BftProcessor.awaitStop() waiting for the BFT event thread to leave its dispatch loop.
+    //     That event thread imports blocks, which fires the block-added observers inline, one of
+    //     which is SyncState's own observer calling the synchronized checkInSync(). Stopping
+    //     inline therefore closes a deadlock cycle: the publisher waits for the event thread
+    //     while holding the monitor the event thread needs. Everything sync-related then stops
+    //     for good, because the chain-download loop can no longer set or clear a sync target.
+    //
+    //  2. start() and stop() are multi-step sequences over bftProcessor/bftExecutors guarded
+    //     only by a leading CAS. Interleaving them can leave the coordinator RUNNING with
+    //     shut-down executors, in which case isMining() reports true, nothing is mined, and
+    //     every subsequent start() is a no-op CAS.
+    //
+    // Notifications now only record the state we should be in; the executor reconciles towards
+    // it. Because reconcile() re-reads desiredMining, the last recorded intent always wins no
+    // matter what order the notifications arrive in or how they interleave.
+    shuttingDown = false;
+    transitionExecutor =
+        Executors.newSingleThreadExecutor(
+            new ThreadFactoryBuilder()
+                .setNameFormat("BftMiningCoordinator-transitions")
+                .setDaemon(true)
+                .build());
+
+    syncState.subscribeSyncStatus(_ -> requestMiningState(!isSyncing(), "sync status change"));
 
     syncState.subscribeCompletionReached(
         new BesuEvents.InitialSyncCompletionListener() {
           @Override
           public void onInitialSyncCompleted() {
-            LOG.info("Starting BFT mining coordinator following initial sync");
-            enable();
-            start();
+            requestMiningState(!isSyncing(), "initial sync completed");
           }
 
           @Override
@@ -221,8 +261,76 @@ public class BftMiningCoordinator implements MiningCoordinator, BlockAddedObserv
         });
   }
 
+  private boolean isSyncing() {
+    return syncState.syncTarget().isPresent() || !syncState.isInitialSyncPhaseDone();
+  }
+
+  /**
+   * Records the state the coordinator should be in and queues a reconciliation. Never blocks, so it
+   * is safe to call from a thread holding a lock (as SyncState's publishers do).
+   *
+   * @param mine whether the coordinator should be mining
+   * @param reason operator-facing description of why, for the transition log line
+   */
+  private void requestMiningState(final boolean mine, final String reason) {
+    final ExecutorService executor = transitionExecutor;
+    if (executor == null || shuttingDown) {
+      return;
+    }
+    desiredMining.set(mine);
+    transitionReason.set(reason);
+    try {
+      executor.execute(this::reconcileMiningState);
+    } catch (final RejectedExecutionException e) {
+      // Only reachable once awaitStop() has shut the executor down, i.e. we are terminating.
+      LOG.debug("Ignoring BFT mining coordinator transition request during shutdown", e);
+    }
+  }
+
+  /**
+   * Drives the coordinator towards the most recently requested state. Runs only on
+   * transitionExecutor, so start() and stop() can never overlap, and re-reading desiredMining here
+   * rather than capturing it per request is what makes the last request win.
+   */
+  private void reconcileMiningState() {
+    if (shuttingDown) {
+      return;
+    }
+    final boolean mine = desiredMining.get();
+    if (mine == isMining()) {
+      // Already where we want to be; a superseded or duplicate request.
+      return;
+    }
+    final String reason = transitionReason.get();
+    try {
+      if (mine) {
+        LOG.info("Starting BFT mining coordinator following sync (trigger: {})", reason);
+        enable();
+        start();
+      } else {
+        LOG.info("Stopping BFT mining coordinator while we are syncing (trigger: {})", reason);
+        stop();
+      }
+    } catch (final RuntimeException e) {
+      // Must not escape: this used to run inside SyncState.publishSyncStatus, where a throw
+      // propagated out of Subscribers.forEach (created without suppressCallbackExceptions),
+      // skipped checkInSync() and killed PipelineChainDownloader's download loop for good --
+      // repeatUnlessDownloadComplete() is not covered by its own exceptionallyCompose().
+      LOG.error("Failed to {} BFT mining coordinator ({})", mine ? "start" : "stop", reason, e);
+    }
+  }
+
   @Override
   public void awaitStop() throws InterruptedException {
+    shuttingDown = true;
+    final ExecutorService executor = transitionExecutor;
+    if (executor != null) {
+      executor.shutdown();
+      if (!executor.awaitTermination(TRANSITION_SHUTDOWN_TIMEOUT.toSeconds(), TimeUnit.SECONDS)) {
+        LOG.error("BFT mining coordinator transition executor did not shutdown cleanly.");
+        executor.shutdownNow();
+      }
+    }
     bftExecutors.awaitStop();
   }
 

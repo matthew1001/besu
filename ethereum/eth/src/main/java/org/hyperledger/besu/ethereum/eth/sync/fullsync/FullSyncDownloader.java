@@ -30,6 +30,9 @@ import org.hyperledger.besu.plugin.services.MetricsSystem;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +40,15 @@ import org.slf4j.LoggerFactory;
 public class FullSyncDownloader {
 
   private static final Logger LOG = LoggerFactory.getLogger(FullSyncDownloader.class);
-  private final ChainDownloader chainDownloader;
+
+  // The download loop is single-shot -- ChainDownloader.start() throws on a second call -- so
+  // recovering from a loop that has exited or wedged means building a replacement. Keep the recipe
+  // rather than just the instance.
+  private final Supplier<ChainDownloader> chainDownloaderFactory;
+  private final AtomicReference<ChainDownloader> chainDownloader = new AtomicReference<>();
+  private final AtomicReference<CompletableFuture<Void>> currentDownload = new AtomicReference<>();
+  private final AtomicBoolean stopped = new AtomicBoolean(false);
+  private final StalledChainDownloadWatchdog watchdog;
   private final Optional<ChainDownloader> era1PrepipelineChainDownloader;
   private final SynchronizerConfiguration syncConfig;
   private final ProtocolContext protocolContext;
@@ -75,17 +86,35 @@ public class FullSyncDownloader {
       this.era1PrepipelineChainDownloader = Optional.empty();
     }
 
-    this.chainDownloader =
-        FullSyncChainDownloader.create(
-            syncConfig,
-            protocolSchedule,
-            protocolContext,
-            ethContext,
+    this.chainDownloaderFactory =
+        () ->
+            FullSyncChainDownloader.create(
+                syncConfig,
+                protocolSchedule,
+                protocolContext,
+                ethContext,
+                syncState,
+                metricsSystem,
+                terminationCondition,
+                syncDurationMetrics,
+                peerTaskExecutor);
+    this.chainDownloader.set(chainDownloaderFactory.get());
+
+    this.watchdog =
+        new StalledChainDownloadWatchdog(
             syncState,
-            metricsSystem,
-            terminationCondition,
-            syncDurationMetrics,
-            peerTaskExecutor);
+            protocolContext.getBlockchain(),
+            ethContext.getScheduler(),
+            this::downloadLoopFinished,
+            // Off the watchdog's own thread: the watchdog check runs on EthScheduler's timer
+            // executor, which is single-threaded and shared with the download loop's retry and
+            // find-sync-target delays. Restarting there would put a sync-target publish (and every
+            // subscriber callback it fans out to) on that one thread.
+            () -> ethContext.getScheduler().scheduleServiceTask(this::restartChainDownload),
+            StalledChainDownloadWatchdog.DEFAULT_CHECK_INTERVAL,
+            StalledChainDownloadWatchdog.DEFAULT_STALLED_CHECKS_BEFORE_RESTART,
+            StalledChainDownloadWatchdog.DEFAULT_BEHIND_TOLERANCE,
+            metricsSystem);
   }
 
   public CompletableFuture<Void> start() {
@@ -96,18 +125,75 @@ public class FullSyncDownloader {
       return era1PipelineFuture.thenAccept(
           (v) -> {
             LOG.info("Starting full sync.");
-            chainDownloader.start();
+            startChainDownload();
           });
 
     } else {
       LOG.info("Starting full sync.");
-      return chainDownloader.start();
+      return startChainDownload();
     }
   }
 
   public void stop() {
+    stopped.set(true);
+    watchdog.stop();
     era1PrepipelineChainDownloader.ifPresent((p) -> p.cancel());
-    chainDownloader.cancel();
+    chainDownloader.get().cancel();
+  }
+
+  private CompletableFuture<Void> startChainDownload() {
+    final CompletableFuture<Void> download = chainDownloader.get().start();
+    currentDownload.set(download);
+    watchdog.start();
+    return download;
+  }
+
+  private boolean downloadLoopFinished() {
+    final CompletableFuture<Void> download = currentDownload.get();
+    return download != null && download.isDone();
+  }
+
+  /**
+   * The future of the download loop currently running, or null if none has been started. Only set
+   * by a {@code start()} that returned normally, so a fresh instance here is evidence that a
+   * replacement loop really did start.
+   *
+   * @return the current download loop's future
+   */
+  // Visible for testing.
+  CompletableFuture<Void> currentDownloadFuture() {
+    return currentDownload.get();
+  }
+
+  /**
+   * Replaces the chain download loop with a fresh one. Called by the watchdog when the current loop
+   * has stopped making progress while the node is behind its peers.
+   *
+   * <p>The sync target is cleared as part of the swap. Consumers watch it to decide whether the
+   * node is syncing -- the BFT mining coordinator stops mining while a target is set -- and a
+   * target left pointing at an abandoned download would keep them pinned in that state.
+   */
+  // Visible for testing. Synchronized so two watchdog firings cannot both build a replacement.
+  synchronized void restartChainDownload() {
+    if (stopped.get()) {
+      return;
+    }
+    try {
+      final ChainDownloader previous = chainDownloader.get();
+      if (previous != null) {
+        previous.cancel();
+      }
+      syncState.clearSyncTarget();
+
+      final ChainDownloader replacement = chainDownloaderFactory.get();
+      chainDownloader.set(replacement);
+      currentDownload.set(replacement.start());
+      LOG.info("Chain download restarted.");
+    } catch (final RuntimeException e) {
+      // Nothing observes the future this runs on, so an escaping throw would vanish. Leave the
+      // watchdog able to try again on its next stall window instead.
+      LOG.error("Failed to restart the chain download; will retry if the stall persists", e);
+    }
   }
 
   public TrailingPeerRequirements calculateTrailingPeerRequirements() {

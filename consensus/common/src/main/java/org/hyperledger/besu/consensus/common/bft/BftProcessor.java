@@ -16,6 +16,7 @@ package org.hyperledger.besu.consensus.common.bft;
 
 import org.hyperledger.besu.consensus.common.bft.events.BftEvent;
 
+import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -27,6 +28,9 @@ import org.slf4j.LoggerFactory;
 public class BftProcessor implements Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(BftProcessor.class);
+
+  /** Upper bound on how long {@link #awaitStop()} blocks. Matches BftExecutors.shutdownTimeout. */
+  private static final Duration SHUTDOWN_TIMEOUT = Duration.ofSeconds(30);
 
   private final BftEventQueue incomingQueue;
   private volatile boolean shutdown = false;
@@ -61,17 +65,30 @@ public class BftProcessor implements Runnable {
   }
 
   /**
-   * Await stop. Returns immediately if {@link #run()} has never executed (no thread was ever
-   * scheduled), since there is then nothing to wait for and {@link #shutdownLatch} would never be
-   * counted down.
+   * Await stop, for up to {@link #SHUTDOWN_TIMEOUT}. Returns immediately if {@link #run()} has
+   * never executed (no thread was ever scheduled), since there is then nothing to wait for and
+   * {@link #shutdownLatch} would never be counted down.
    *
+   * <p>The wait is bounded on purpose. An unbounded wait here is a liveness hazard for every
+   * caller: the event loop only re-checks its shutdown flag between events, so anything that keeps
+   * it inside {@code handleBftEvent} (for instance a lock held by whoever is stopping us) would
+   * otherwise wedge the calling thread permanently. Timing out and logging leaves a diagnosable
+   * node instead of a silent one.
+   *
+   * @return true if the event loop exited, false if the wait timed out
    * @throws InterruptedException the interrupted exception
    */
-  public void awaitStop() throws InterruptedException {
+  public boolean awaitStop() throws InterruptedException {
     if (processorThread == null) {
-      return;
+      return true;
     }
-    shutdownLatch.await();
+    final boolean stopped = shutdownLatch.await(SHUTDOWN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+    if (!stopped) {
+      LOG.error(
+          "BFT event processor did not stop within {}; it may still be dispatching an event",
+          SHUTDOWN_TIMEOUT);
+    }
+    return stopped;
   }
 
   /**

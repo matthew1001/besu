@@ -32,9 +32,14 @@ import org.hyperledger.besu.ethereum.eth.sync.state.SyncState;
 import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
 import org.hyperledger.besu.metrics.SyncDurationMetrics;
 import org.hyperledger.besu.metrics.noop.NoOpMetricsSystem;
+import org.hyperledger.besu.plugin.data.SyncStatus;
 import org.hyperledger.besu.plugin.services.MetricsSystem;
 import org.hyperledger.besu.plugin.services.storage.DataStorageFormat;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.AfterEach;
@@ -135,5 +140,65 @@ public class FullSyncDownloaderTest {
 
     assertThat(synchronizer.calculateTrailingPeerRequirements())
         .isEqualTo(TrailingPeerRequirements.UNRESTRICTED);
+  }
+
+  /**
+   * What the watchdog invokes when a download loop has stopped making progress. ChainDownloader is
+   * single-shot -- start() throws on a second call -- so the restart has to build a replacement,
+   * and it has to release the sync target: consumers gate on it to decide whether the node is
+   * syncing (the BFT mining coordinator stops mining while one is set) and would otherwise stay
+   * pinned to a download that no longer exists.
+   */
+  @ParameterizedTest
+  @ArgumentsSource(FullSyncDownloaderTestArguments.class)
+  public void restartingTheDownloadReleasesTheSyncTargetAndBuildsAReplacement(
+      final DataStorageFormat storageFormat) {
+    setupTest(storageFormat);
+    localBlockchainSetup.importFirstBlocks(2);
+    final FullSyncDownloader synchronizer = downloader(SynchronizerConfiguration.builder().build());
+
+    final List<Optional<SyncStatus>> publishedStatuses = new CopyOnWriteArrayList<>();
+    syncState.subscribeSyncStatus(publishedStatuses::add);
+
+    // A peer level with us, so the replacement loop parks in its "caught up" wait rather than
+    // starting a real download pipeline.
+    final RespondingEthPeer peer = EthProtocolManagerTestUtil.createPeer(ethProtocolManager, 2);
+    syncState.setSyncTarget(peer.getEthPeer(), localBlockchain.getChainHeadHeader());
+    assertThat(syncState.syncTarget()).isPresent();
+
+    assertThat(synchronizer.currentDownloadFuture()).isNull();
+
+    synchronizer.restartChainDownload();
+    final CompletableFuture<Void> firstReplacement = synchronizer.currentDownloadFuture();
+    // Non-null only if the replacement's start() returned normally.
+    assertThat(firstReplacement).isNotNull();
+    assertThat(publishedStatuses).contains(Optional.empty());
+
+    // Restarting again must build another downloader: reusing the previous one would throw
+    // "Cannot start a chain download twice" and leave the recorded future untouched.
+    syncState.setSyncTarget(peer.getEthPeer(), localBlockchain.getChainHeadHeader());
+    synchronizer.restartChainDownload();
+    assertThat(synchronizer.currentDownloadFuture()).isNotNull().isNotSameAs(firstReplacement);
+
+    synchronizer.stop();
+  }
+
+  /** After stop() the watchdog must not resurrect the download loop. */
+  @ParameterizedTest
+  @ArgumentsSource(FullSyncDownloaderTestArguments.class)
+  public void restartIsIgnoredOnceStopped(final DataStorageFormat storageFormat) {
+    setupTest(storageFormat);
+    localBlockchainSetup.importFirstBlocks(2);
+    final FullSyncDownloader synchronizer = downloader(SynchronizerConfiguration.builder().build());
+
+    final RespondingEthPeer peer = EthProtocolManagerTestUtil.createPeer(ethProtocolManager, 2);
+    syncState.setSyncTarget(peer.getEthPeer(), localBlockchain.getChainHeadHeader());
+
+    synchronizer.stop();
+    synchronizer.restartChainDownload();
+
+    // The target set above is untouched and no loop was started: nothing was resurrected.
+    assertThat(syncState.syncTarget()).isPresent();
+    assertThat(synchronizer.currentDownloadFuture()).isNull();
   }
 }

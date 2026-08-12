@@ -15,6 +15,7 @@
 package org.hyperledger.besu.ethereum.eth.sync.state;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doReturn;
@@ -56,6 +57,7 @@ import org.hyperledger.besu.plugin.services.BesuEvents.InitialSyncCompletionList
 import org.hyperledger.besu.plugin.services.BesuEvents.SyncStatusListener;
 import org.hyperledger.besu.plugin.services.BesuEvents.TTDReachedListener;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -788,6 +790,48 @@ public class SyncStateTest {
     assertThat(statuses.get(0).get().getCurrentBlock()).isEqualTo(10);
     assertThat(statuses.get(1).get().getCurrentBlock()).isEqualTo(50);
     assertThat(statuses.get(2).get().getCurrentBlock()).isEqualTo(100);
+  }
+
+  /**
+   * Notifying subscribers while holding this object's monitor makes every callback run with
+   * SyncState locked, which deadlocks against anything the callback waits on that in turn needs
+   * SyncState. {@link SyncState#checkInSync()} is exactly that: the blockchain observer registered
+   * in the constructor calls it inline on whichever thread appended the block, so a consensus
+   * engine that stops its block-producing thread from inside a sync-status callback wedges both
+   * threads.
+   */
+  @Test
+  public void syncStatusListenersAreNotNotifiedWhileHoldingTheMonitor() {
+    final List<Boolean> heldLockDuringCallback = new ArrayList<>();
+    syncState.subscribeSyncStatus(_ -> heldLockDuringCallback.add(Thread.holdsLock(syncState)));
+
+    syncState.setSyncTarget(syncTargetPeer.getEthPeer(), blockchain.getBlockHeader(3L).get());
+    syncState.clearSyncTarget();
+    syncState.setSyncProgress(0, 10, 100);
+
+    assertThat(heldLockDuringCallback).hasSize(3).containsOnly(false);
+  }
+
+  /**
+   * Subscribers is created without suppressCallbackExceptions, so a throwing listener propagates
+   * out of publishSyncStatus. The in-sync trackers must still be updated, or a single bad
+   * subscriber silently strands every other consumer of sync state.
+   */
+  @Test
+  public void inSyncTrackersAreUpdatedEvenWhenASyncStatusListenerThrows() {
+    syncState.subscribeSyncStatus(
+        _ -> {
+          throw new IllegalStateException("bad subscriber");
+        });
+
+    assertThatThrownBy(
+            () ->
+                syncState.setSyncTarget(
+                    syncTargetPeer.getEthPeer(), blockchain.getBlockHeader(3L).get()))
+        .isInstanceOf(IllegalStateException.class);
+
+    // checkInSync() ran despite the throw: the trackers saw the out-of-sync target.
+    verify(inSyncListener).onInSyncStatusChange(false);
   }
 
   @Test
