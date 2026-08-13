@@ -44,6 +44,10 @@ public class SyncState implements NewPayloadListener {
   private final Blockchain blockchain;
   private final EthPeers ethPeers;
 
+  // Guards the in-sync re-evaluation, deliberately separate from this object's monitor (see
+  // checkInSync())
+  private final Object inSyncLock = new Object();
+
   private final AtomicLong inSyncSubscriberId = new AtomicLong();
   private final Map<Long, InSyncTracker> inSyncTrackers = new ConcurrentHashMap<>();
   private final Subscribers<SyncStatusListener> syncStatusListeners = Subscribers.create();
@@ -324,22 +328,25 @@ public class SyncState implements NewPayloadListener {
             .orElse(localChainHeight));
   }
 
-  private synchronized void checkInSync() {
-    final ChainHead localChain = getLocalChainHead();
-    final Optional<ChainHeadEstimate> syncTargetChain = getSyncTargetChainHead();
-    final Optional<ChainHeadEstimate> bestPeerChain = getBestPeerChainHead();
+  /** Evaluates whether this node is in sync and notifies any tracker whose verdict changed. */
+  private void checkInSync() {
+    synchronized (inSyncLock) {
+      final ChainHead localChain = getLocalChainHead();
+      final Optional<ChainHeadEstimate> syncTargetChain = getSyncTargetChainHead();
+      final Optional<ChainHeadEstimate> bestPeerChain = getBestPeerChainHead();
 
-    // Remove listener when we've found a peer.
-    newPeerListenerId.ifPresent(
-        listenerId -> {
-          ethPeers.unsubscribeConnect(listenerId);
-          newPeerListenerId = Optional.empty();
-        });
+      // Remove listener when we've found a peer.
+      newPeerListenerId.ifPresent(
+          listenerId -> {
+            ethPeers.unsubscribeConnect(listenerId);
+            newPeerListenerId = Optional.empty();
+          });
 
-    inSyncTrackers
-        .values()
-        .forEach(
-            (syncTracker) -> syncTracker.checkState(localChain, syncTargetChain, bestPeerChain));
+      inSyncTrackers
+          .values()
+          .forEach(
+              (syncTracker) -> syncTracker.checkState(localChain, syncTargetChain, bestPeerChain));
+    }
   }
 
   public Optional<Checkpoint> getCheckpoint() {

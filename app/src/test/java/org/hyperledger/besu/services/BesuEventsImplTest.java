@@ -228,17 +228,7 @@ public class BesuEventsImplTest {
   /**
    * A sync-status listener registered through {@code BesuEvents.addSyncStatusListener} is invoked
    * by SyncState on whichever thread changed the sync target. If SyncState holds its own monitor
-   * across that callback, any plugin listener that waits on another thread wedges the node:
-   * SyncState registers a block-added observer in its own constructor that calls the synchronized
-   * checkInSync() inline on whichever thread appended the block, so the thread the plugin is
-   * waiting for cannot get in.
-   *
-   * <p>This is the same cycle that stalled QBFT validators indefinitely -- BftMiningCoordinator's
-   * listener blocks in BftProcessor.awaitStop() waiting for the BFT event thread, which is inside a
-   * block import -- but reached entirely through the public plugin API, where Besu cannot constrain
-   * what the callback does. Besu's own ReadinessCheckPlugin is safe only because its listener is a
-   * single volatile field assignment; a plugin that hands the status to its own worker and waits
-   * for an acknowledgement is not doing anything the API documents against.
+   * across that callback, any plugin listener that waits on another thread causes the node to hang.
    */
   @Test
   public void pluginSyncStatusListenerWaitingOnAnotherThreadDoesNotBlockBlockImport()
