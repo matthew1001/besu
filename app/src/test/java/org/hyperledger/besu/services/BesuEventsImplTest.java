@@ -79,6 +79,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
@@ -220,6 +223,74 @@ public class BesuEventsImplTest {
 
     clearSyncTarget();
     assertThat(result.get()).isNull();
+  }
+
+  /**
+   * A sync-status listener registered through {@code BesuEvents.addSyncStatusListener} is invoked
+   * by SyncState on whichever thread changed the sync target. If SyncState holds its own monitor
+   * across that callback, any plugin listener that waits on another thread wedges the node:
+   * SyncState registers a block-added observer in its own constructor that calls the synchronized
+   * checkInSync() inline on whichever thread appended the block, so the thread the plugin is
+   * waiting for cannot get in.
+   *
+   * <p>This is the same cycle that stalled QBFT validators indefinitely -- BftMiningCoordinator's
+   * listener blocks in BftProcessor.awaitStop() waiting for the BFT event thread, which is inside a
+   * block import -- but reached entirely through the public plugin API, where Besu cannot constrain
+   * what the callback does. Besu's own ReadinessCheckPlugin is safe only because its listener is a
+   * single volatile field assignment; a plugin that hands the status to its own worker and waits
+   * for an acknowledgement is not doing anything the API documents against.
+   */
+  @Test
+  public void pluginSyncStatusListenerWaitingOnAnotherThreadDoesNotBlockBlockImport()
+      throws Exception {
+    final CountDownLatch inPluginCallback = new CountDownLatch(1);
+    final CountDownLatch blockAppended = new CountDownLatch(1);
+    final AtomicBoolean importProgressedDuringCallback = new AtomicBoolean();
+
+    // The same call ReadinessCheckPlugin.start() makes, with a listener that waits on a worker
+    // instead of assigning a field.
+    serviceImpl.addSyncStatusListener(
+        _ -> {
+          inPluginCallback.countDown();
+          try {
+            importProgressedDuringCallback.set(blockAppended.await(5, TimeUnit.SECONDS));
+          } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        });
+
+    final Thread importer =
+        new Thread(
+            () -> {
+              try {
+                if (!inPluginCallback.await(5, TimeUnit.SECONDS)) {
+                  return;
+                }
+                // Appending fires SyncState's own block-added observer, which calls the
+                // synchronized checkInSync() on this thread.
+                final Block block =
+                    gen.block(
+                        new BlockDataGenerator.BlockOptions()
+                            .setParentHash(blockchain.getGenesisBlock().getHash()));
+                blockchain.appendBlock(block, gen.receipts(block));
+              } catch (final InterruptedException e) {
+                Thread.currentThread().interrupt();
+              } finally {
+                blockAppended.countDown();
+              }
+            },
+            "block-importer");
+    importer.start();
+
+    // Publishes on this thread, as the chain-download loop does in production.
+    setSyncTarget();
+    importer.join(TimeUnit.SECONDS.toMillis(30));
+
+    assertThat(importProgressedDuringCallback)
+        .withFailMessage(
+            "a block import could not proceed while a plugin sync-status listener was running: "
+                + "SyncState is holding its monitor across subscriber callbacks")
+        .isTrue();
   }
 
   private void setSyncTarget() {
