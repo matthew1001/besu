@@ -44,8 +44,9 @@ public class SyncState implements NewPayloadListener {
   private final Blockchain blockchain;
   private final EthPeers ethPeers;
 
-  // Guards the in-sync re-evaluation, deliberately separate from this object's monitor (see
-  // checkInSync())
+  // Ensures checkInSync() re-evaluation gives a consistent view of sync status. A
+  // standalone lock is used instead of the object monitor to prevent checkInSync()
+  // causing a deadlock while synchronized on the object monitor.
   private final Object inSyncLock = new Object();
 
   private final AtomicLong inSyncSubscriberId = new AtomicLong();
