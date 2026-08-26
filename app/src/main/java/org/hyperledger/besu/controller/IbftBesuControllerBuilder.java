@@ -18,6 +18,7 @@ import org.hyperledger.besu.config.BftConfigOptions;
 import org.hyperledger.besu.config.BftFork;
 import org.hyperledger.besu.consensus.common.BftValidatorOverrides;
 import org.hyperledger.besu.consensus.common.EpochManager;
+import org.hyperledger.besu.consensus.common.ForkSpec;
 import org.hyperledger.besu.consensus.common.ForksSchedule;
 import org.hyperledger.besu.consensus.common.bft.BftBlockInterface;
 import org.hyperledger.besu.consensus.common.bft.BftContext;
@@ -80,7 +81,9 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -318,20 +321,25 @@ public class IbftBesuControllerBuilder extends BesuControllerBuilder {
   }
 
   private BftValidatorOverrides convertIbftForks(final List<BftFork> bftForks) {
-    final Map<Long, List<Address>> result = new HashMap<>();
+    final Map<Long, List<Address>> byBlock = new HashMap<>();
+    final NavigableMap<Long, List<Address>> byTimestamp = new TreeMap<>();
 
     for (final BftFork fork : bftForks) {
       fork.getValidators()
           .ifPresent(
-              validators ->
-                  result.put(
-                      fork.getForkBlock(),
-                      validators.stream()
-                          .map(Address::fromHexString)
-                          .collect(Collectors.toList())));
+              validators -> {
+                final long value = fork.getForkBlock();
+                final List<Address> addresses =
+                    validators.stream().map(Address::fromHexString).collect(Collectors.toList());
+                if (ForkSpec.scheduleTypeFor(value) == ForkSpec.ForkScheduleType.TIME) {
+                  byTimestamp.put(value, addresses);
+                } else {
+                  byBlock.put(value, addresses);
+                }
+              });
     }
 
-    return new BftValidatorOverrides(result);
+    return new BftValidatorOverrides(byBlock, byTimestamp);
   }
 
   private static MinedBlockObserver blockLogger(

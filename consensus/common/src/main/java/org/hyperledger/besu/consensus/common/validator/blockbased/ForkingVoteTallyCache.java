@@ -19,11 +19,16 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import org.hyperledger.besu.consensus.common.BftValidatorOverrides;
 import org.hyperledger.besu.consensus.common.BlockInterface;
 import org.hyperledger.besu.consensus.common.EpochManager;
+import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.ethereum.chain.Blockchain;
 import org.hyperledger.besu.ethereum.core.BlockHeader;
 
+import java.util.Collection;
+import java.util.Optional;
+
 class ForkingVoteTallyCache extends VoteTallyCache {
 
+  private final Blockchain blockchain;
   private final BftValidatorOverrides validatorOverrides;
 
   public ForkingVoteTallyCache(
@@ -34,6 +39,7 @@ class ForkingVoteTallyCache extends VoteTallyCache {
       final BftValidatorOverrides validatorOverrides) {
     super(blockchain, voteTallyUpdater, epochManager, blockInterface);
     checkNotNull(validatorOverrides);
+    this.blockchain = blockchain;
     this.validatorOverrides = validatorOverrides;
   }
 
@@ -41,9 +47,27 @@ class ForkingVoteTallyCache extends VoteTallyCache {
   protected VoteTally getValidatorsAfter(final BlockHeader header) {
     final long nextBlockNumber = header.getNumber() + 1L;
 
-    return validatorOverrides
-        .getForBlock(nextBlockNumber)
-        .map(VoteTally::new)
-        .orElse(super.getValidatorsAfter(header));
+    final Optional<Collection<Address>> blockOverride =
+        validatorOverrides.getForBlock(nextBlockNumber);
+    if (blockOverride.isPresent()) {
+      return new VoteTally(blockOverride.get());
+    }
+
+    // A timestamp-based validator transition fires on the first block whose header crosses the
+    // fork timestamp (relative to its parent).
+    if (validatorOverrides.hasTimestampOverrides()) {
+      final long parentTimestamp =
+          blockchain
+              .getBlockHeader(header.getParentHash())
+              .map(BlockHeader::getTimestamp)
+              .orElse(-1L);
+      final Optional<Collection<Address>> timestampOverride =
+          validatorOverrides.getForTimestampBoundary(parentTimestamp, header.getTimestamp());
+      if (timestampOverride.isPresent()) {
+        return new VoteTally(timestampOverride.get());
+      }
+    }
+
+    return super.getValidatorsAfter(header);
   }
 }

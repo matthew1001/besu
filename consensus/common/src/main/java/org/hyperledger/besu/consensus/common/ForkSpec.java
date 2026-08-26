@@ -35,6 +35,14 @@ public class ForkSpec<C> {
     TIME
   }
 
+  /**
+   * We use a pragmatic approach to determine whether a transition is a timestamp or a block number.
+   * Future iterations on genesis structure may introduce a more deterministic differentiation
+   * between them but existing genesis files need supporting for the time being. This threshold is
+   * the timestamp of the shanghai epoch, the first timestamp-based EVM spec.
+   */
+  public static final long TIMESTAMP_THRESHOLD = 1_681_338_455L;
+
   private final long block;
   private ForkScheduleType forkType = ForkScheduleType.BLOCK; // Default type
   private final C value;
@@ -75,6 +83,19 @@ public class ForkSpec<C> {
    */
   public ForkScheduleType getForkType() {
     return forkType;
+  }
+
+  /**
+   * Simple classification of a transition value as block-based or timestamp-based purely by
+   * magnitude.
+   *
+   * @param blockNumberOrTimestamp the raw transition value
+   * @return TIME if the value is at or above the threshold, otherwise BLOCK
+   */
+  public static ForkScheduleType scheduleTypeFor(final long blockNumberOrTimestamp) {
+    return blockNumberOrTimestamp >= TIMESTAMP_THRESHOLD
+        ? ForkScheduleType.TIME
+        : ForkScheduleType.BLOCK;
   }
 
   /**
