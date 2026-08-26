@@ -505,25 +505,25 @@ public class QbftBesuControllerBuilder extends BesuControllerBuilder {
   private void registerEmptyBlockPeriodMetrics(
       final MetricsSystem metricsSystem, final BlockTimer blockTimer) {
     metricsSystem.createLongGauge(
-        BesuMetricCategory.CONSENSUS,
+        BesuMetricCategory.BFT,
         "empty_block_period_waiting_seconds",
         "Seconds this node has been intentionally not proposing because it has nothing worth putting in a block; 0 when producing normally. A value above emptyblockperiodseconds means the wait should have ended and the node is not making progress",
         blockTimer::getEmptyBlockWaitSeconds);
 
     metricsSystem.createLongGauge(
-        BesuMetricCategory.CONSENSUS,
+        BesuMetricCategory.BFT,
         "empty_block_period_seconds",
         "Configured emptyblockperiodseconds currently in effect, 0 when not enabled. Follows QBFT transitions, so alerts can compare empty_block_period_waiting_seconds against this rather than hardcoding a threshold",
         blockTimer::getConfiguredEmptyBlockPeriodSeconds);
 
     metricsSystem.createLongGauge(
-        BesuMetricCategory.CONSENSUS,
+        BesuMetricCategory.BFT,
         "block_period_seconds",
         "Configured blockperiodseconds currently in effect. Follows QBFT transitions",
         blockTimer::getConfiguredBlockPeriodSeconds);
 
     metricsSystem.createLongGauge(
-        BesuMetricCategory.CONSENSUS,
+        BesuMetricCategory.BFT,
         "empty_block_period_expiry_seconds",
         "Unix time in seconds at which the current empty block period ends, or 0 when not waiting",
         () -> blockTimer.getEmptyBlockPeriodExpiryMillis() / 1000L);

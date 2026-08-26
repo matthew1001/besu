@@ -57,6 +57,7 @@
 - Engine API methods now execute concurrently, with only `engine_forkchoiceUpdated` and `engine_newPayload` calls processed serially in arrival order as the Engine API spec mandates. Previously all engine calls were serialized on a single thread, so light requests like `engine_getBlobsV2` could queue behind a block import and exceed the consensus client's timeout. [#11053](https://github.com/besu-eth/besu/pull/11053)
 - Add a server-side cap on EVM steps captured per debug_traceCallMany to prevent unbounded execution [#11142](https://github.com/besu-eth/besu/pull/11142)
 - Add EIP-8070 Engine API surface: `engine_getBlobsV4` and custodyColumns [#11141](https://github.com/besu-eth/besu/pull/11141)
+- Add metrics for `emptyblockperiodseconds` to aid with observability (e.g. diagnosing unhealthy vs quiet chains) [#11162](https://github.com/besu-eth/besu/pull/11162)
 
 ## 26.8.0
 

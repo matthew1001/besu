@@ -40,20 +40,11 @@ public class BlockTimer {
   private long blockPeriodSeconds;
   private long emptyBlockPeriodSeconds;
 
-  // Observability for the empty-block period. A chain producing no blocks for a long time is
-  // indistinguishable from a stalled one without this, so expose whether the silence is deliberate
-  // and when it is due to end. Volatile rather than guarded: read from the metrics scrape thread.
-  // Start of the current run of "nothing worth proposing" decisions, or 0 when not waiting. A
-  // duration rather than a flag on purpose: a flag set on entry and cleared only when a new height
-  // begins would stay set forever if the node wedged mid-wait, reporting deliberate idleness for a
-  // node that had actually died. A duration is bounded by emptyblockperiodseconds, so exceeding it
-  // is itself the signal that something is wrong.
+  // Metrics support. A chain producing no blocks for a long time is indistinguishable from
+  // a stalled one without this, so we expose whether the silence is deliberate and when it
+  // is due to end.
   private volatile long emptyBlockWaitStartedMillis = 0L;
   private volatile long emptyBlockPeriodExpiryMillis = 0L;
-
-  // Mirrors of the configured periods, published for metrics. Read on the metrics scrape thread, so
-  // kept as volatiles rather than reusing the synchronized accessors: no reason to have a scrape
-  // contend for this object's monitor with the BFT event thread.
   private volatile long configuredBlockPeriodSeconds = 0L;
   private volatile long configuredEmptyBlockPeriodSeconds = 0L;
 
@@ -219,9 +210,8 @@ public class BlockTimer {
   }
 
   /**
-   * The emptyblockperiodseconds currently in effect, for metrics. Re-read on every block period, so
-   * it follows QBFT transitions. Zero until the first block timer is armed, and zero when the
-   * feature is not configured.
+   * The emptyblockperiodseconds currently in effect, used for metrics only. Re-read on every block
+   * period so it follows QBFT transitions.
    *
    * @return the configured empty block period in seconds
    */
@@ -230,8 +220,7 @@ public class BlockTimer {
   }
 
   /**
-   * The blockperiodseconds currently in effect, for metrics. Zero until the first block timer is
-   * armed.
+   * The blockperiodseconds currently in effect, used for metrics only.
    *
    * @return the configured block period in seconds
    */
@@ -240,11 +229,8 @@ public class BlockTimer {
   }
 
   /**
-   * How long this node has been continuously choosing not to propose because it has nothing worth
-   * putting in a block. Zero when not waiting.
-   *
-   * <p>A healthy wait never exceeds {@code emptyblockperiodseconds}, so a value above that is
-   * evidence the node has stopped making progress rather than that it is deliberately quiet.
+   * For healthy node metrics during an empty block period, returns how long this node has been
+   * continuously choosing not to propose because it has no reason to propose one but is healthy.
    *
    * @return seconds spent in the current empty-block wait, or 0 if not waiting
    */
@@ -257,8 +243,8 @@ public class BlockTimer {
   }
 
   /**
-   * The wall-clock time, in milliseconds since the epoch, at which the current empty-block period
-   * ends. Zero when not waiting.
+   * To aid with metrics, returns the wall-clock time in milliseconds at which the current
+   * empty-block period ends.
    *
    * @return the empty block period expiry time in milliseconds, or 0 if not waiting
    */

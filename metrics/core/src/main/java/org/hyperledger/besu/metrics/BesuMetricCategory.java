@@ -58,8 +58,8 @@ public enum BesuMetricCategory implements MetricCategory {
   BAL("bal"),
   /** Block processing besu metric category. */
   BONSAI_CACHE("bonsai_cache"),
-  /** Consensus besu metric category. */
-  CONSENSUS("consensus");
+  /** BFT besu metric category. */
+  BFT("bft");
 
   private static final Optional<String> BESU_PREFIX = Optional.of("besu_");
 
