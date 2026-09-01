@@ -524,7 +524,7 @@ public class QbftBesuControllerBuilder extends BesuControllerBuilder {
 
     metricsSystem.createLongGauge(
         BesuMetricCategory.BFT,
-        "empty_block_period_expiry_seconds",
+        "empty_block_period_expiry_timestamp",
         "Unix time in seconds at which the current empty block period ends, or 0 when not waiting",
         () -> blockTimer.getEmptyBlockPeriodExpiryMillis() / 1000L);
   }
