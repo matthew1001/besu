@@ -45,8 +45,6 @@ public class BlockTimer {
   // is due to end.
   private volatile long emptyBlockWaitStartedMillis = 0L;
   private volatile long emptyBlockPeriodExpiryMillis = 0L;
-  private volatile long configuredBlockPeriodSeconds = 0L;
-  private volatile long configuredEmptyBlockPeriodSeconds = 0L;
 
   /**
    * Construct a BlockTimer with primed executor service ready to start timers
@@ -205,27 +203,6 @@ public class BlockTimer {
       final int blockPeriodSeconds, final int emptyBlockPeriodSeconds) {
     this.blockPeriodSeconds = blockPeriodSeconds;
     this.emptyBlockPeriodSeconds = emptyBlockPeriodSeconds;
-    this.configuredBlockPeriodSeconds = blockPeriodSeconds;
-    this.configuredEmptyBlockPeriodSeconds = emptyBlockPeriodSeconds;
-  }
-
-  /**
-   * The emptyblockperiodseconds currently in effect, used for metrics only. Re-read on every block
-   * period so it follows QBFT transitions.
-   *
-   * @return the configured empty block period in seconds
-   */
-  public long getConfiguredEmptyBlockPeriodSeconds() {
-    return configuredEmptyBlockPeriodSeconds;
-  }
-
-  /**
-   * The blockperiodseconds currently in effect, used for metrics only.
-   *
-   * @return the configured block period in seconds
-   */
-  public long getConfiguredBlockPeriodSeconds() {
-    return configuredBlockPeriodSeconds;
   }
 
   /**

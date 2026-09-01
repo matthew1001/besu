@@ -514,13 +514,13 @@ public class QbftBesuControllerBuilder extends BesuControllerBuilder {
         BesuMetricCategory.BFT,
         "empty_block_period_seconds",
         "Configured emptyblockperiodseconds currently in effect, 0 when not enabled. Follows QBFT transitions, so alerts can compare empty_block_period_waiting_seconds against this rather than hardcoding a threshold",
-        blockTimer::getConfiguredEmptyBlockPeriodSeconds);
+        blockTimer::getEmptyBlockPeriodSeconds);
 
     metricsSystem.createLongGauge(
         BesuMetricCategory.BFT,
         "block_period_seconds",
         "Configured blockperiodseconds currently in effect. Follows QBFT transitions",
-        blockTimer::getConfiguredBlockPeriodSeconds);
+        blockTimer::getBlockPeriodSeconds);
 
     metricsSystem.createLongGauge(
         BesuMetricCategory.BFT,
