@@ -9,6 +9,7 @@
 - `eth_feeHistory` now rejects reward percentiles outside `[0, 100]`, not strictly increasing, or more than 100 values (`-32602`), instead of sorting unordered input or silently omitting `reward` for oversize lists. [#11055](https://github.com/besu-eth/besu/issues/11055)
 - Removed the EIP-7610 storage collision check: contract creation no longer aborts when the destination address has non-empty storage but a zero nonce and no code, restoring the EIP-684 conditions for every fork. EIP-7610 was declined for inclusion in Glamsterdam (EIP-7773) and removed from the execution specs retroactively; no mainnet account is affected. `Account.isStorageEmpty()`, which existed only for this check, is removed from the `besu-evm` API. [#11175](https://github.com/besu-eth/besu/pull/11175)
 - Besu now exits on `OutOfMemoryError` (`-XX:+ExitOnOutOfMemoryError`). Use a restart policy, or set `JAVA_OPTS=-XX:-ExitOnOutOfMemoryError` to opt out. [#11300](https://github.com/besu-eth/besu/pull/11300)
+- `--rpc-tx-feecap` now treats a value of 0 as capping transaction fees at 0, rejecting any RPC-submitted transaction with a positive gas price, consistent with `--p2p-tx-feecap`. Previously 0 disabled the cap (behaviour announced as an upcoming breaking change since 26.7.0). To disable RPC fee capping, set the option to a suitably large value instead.
 
 ### Upcoming Breaking Changes
 - Plugin API
@@ -25,7 +26,6 @@
 - `--Xbft-legacy-protocol-encoding` will be removed once Besu 25.x is no longer supported. [#10499](https://github.com/besu-eth/besu/pull/10499)
 - `--Xsnapsync-synchronizer-pivot-block-distance-before-caching` is deprecated (since 26.6.1) and will be removed in a future release; the flag is now a silent no-op.
 - `--snapsync-synchronizer-pre-checkpoint-headers-only-enabled` is deprecated (since 26.8.1) and will be removed in a future release; the flag is now a silent no-op.
-- `--rpc-tx-feecap` will treat a value of 0 as limiting fees to 0. Today it treats 0 as "do not cap fees". To achieve similar behaviour set it to a suitably large value to effectively prevent any fee capping.
 
 ### Bug fixes
 - `eth_simulateV1` simulated blocks now inherit the parent block's `gasLimit` unchanged when no `gasLimit` override is provided, matching the execution-apis spec and the behaviour of geth and Nethermind. Previously `BlockSimulator` applied the EIP-1559 adjustment algorithm toward the node's `targetGasLimit`, causing simulated results to diverge from expected values when the parent's gas limit differed from the target (e.g. 200M on Amsterdam hive fixtures). [#11254](https://github.com/besu-eth/besu/pull/11254)
