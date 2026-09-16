@@ -24,7 +24,6 @@ import org.hyperledger.besu.datatypes.CodeDelegation;
 import org.hyperledger.besu.datatypes.TransactionType;
 import org.hyperledger.besu.datatypes.Wei;
 import org.hyperledger.besu.ethereum.core.Transaction;
-import org.hyperledger.besu.ethereum.core.Util;
 import org.hyperledger.besu.tests.acceptance.bft.BftAcceptanceTestParameterization;
 import org.hyperledger.besu.tests.acceptance.bft.ParameterizedBftTestBase;
 import org.hyperledger.besu.tests.acceptance.dsl.account.Account;
@@ -407,6 +406,10 @@ public class BftMiningSoakTest extends ParameterizedBftTestBase {
                 secp256k1.createKeyPair(
                     secp256k1.createPrivateKey(authorizerPrivateKey.toUnsignedBigInteger())));
 
+    final KeyPair sponsorKeyPair =
+        secp256k1.createKeyPair(
+            secp256k1.createPrivateKey(sponsorPrivateKey.toUnsignedBigInteger()));
+
     final Transaction eip7702Tx =
         Transaction.builder()
             .type(TransactionType.DELEGATE_CODE)
@@ -420,9 +423,7 @@ public class BftMiningSoakTest extends ParameterizedBftTestBase {
             .payload(Bytes.EMPTY)
             .accessList(List.of())
             .codeDelegations(List.of(codeDelegation))
-            .signAndBuild(
-                secp256k1.createKeyPair(
-                    secp256k1.createPrivateKey(sponsorPrivateKey.toUnsignedBigInteger())));
+            .signAndBuild(sponsorKeyPair);
 
     final String eip7702TxHash =
         minerNode1.execute(ethTransactions.sendRawTransaction(eip7702Tx.encoded().toHexString()));
@@ -449,20 +450,18 @@ public class BftMiningSoakTest extends ParameterizedBftTestBase {
     LOG.info(
         "Submitting a {} gas transaction, above the default Osaka per-transaction cap of ~16.7M",
         LARGE_TX_GAS_LIMIT);
-    final KeyPair sponsorKeyPair =
-        secp256k1.createKeyPair(
-            secp256k1.createPrivateKey(sponsorPrivateKey.toUnsignedBigInteger()));
-    final Address sponsorAddress = Util.publicKeyToAddress(sponsorKeyPair.getPublicKey());
-    final BigInteger sponsorNonce =
-        minerNode1.execute(ethTransactions.getTransactionCount(sponsorAddress.toHexString()));
-
+    // Reuse the EIP-7702 sponsor account: it has sent exactly one transaction (the type-4
+    // transaction above, at nonce 0), so its nonce is now 1.
+    // The chain runs with zeroBaseFee, so the effective price of an EIP-1559 transaction is its
+    // priority fee; pay the nodes' min-gas-price floor (1000 wei), the same price the web3j
+    // contract wrappers in this test pay.
     final Transaction largeGasTx =
         Transaction.builder()
             .type(TransactionType.EIP1559)
             .chainId(BigInteger.valueOf(4))
-            .nonce(sponsorNonce.longValue())
-            .maxPriorityFeePerGas(Wei.of(1_000_000_000))
-            .maxFeePerGas(Wei.fromHexString("0x02540BE400"))
+            .nonce(1)
+            .maxPriorityFeePerGas(Wei.of(1000))
+            .maxFeePerGas(Wei.of(1000))
             .gasLimit(LARGE_TX_GAS_LIMIT)
             .to(authorizerAddress)
             .value(Wei.of(1))
@@ -489,9 +488,9 @@ public class BftMiningSoakTest extends ParameterizedBftTestBase {
         Transaction.builder()
             .type(TransactionType.EIP1559)
             .chainId(BigInteger.valueOf(4))
-            .nonce(sponsorNonce.longValue() + 1)
-            .maxPriorityFeePerGas(Wei.of(1_000_000_000))
-            .maxFeePerGas(Wei.fromHexString("0x02540BE400"))
+            .nonce(2)
+            .maxPriorityFeePerGas(Wei.of(1000))
+            .maxFeePerGas(Wei.of(1000))
             .gasLimit(OSAKA_PER_TX_GAS_LIMIT_OVERRIDE + 1)
             .to(authorizerAddress)
             .value(Wei.of(1))
@@ -569,9 +568,7 @@ public class BftMiningSoakTest extends ParameterizedBftTestBase {
     }
   }
 
-  /**
-   * Pre-generates the node's genesis and sets the block gas limit
-   */
+  /** Pre-generates the node's genesis and sets the block gas limit */
   private static void raiseGenesisBlockGasLimit(
       final BesuNode node, final List<BesuNode> allNodes) {
     final Optional<String> genesis = node.getGenesisConfigProvider().create(allNodes);
