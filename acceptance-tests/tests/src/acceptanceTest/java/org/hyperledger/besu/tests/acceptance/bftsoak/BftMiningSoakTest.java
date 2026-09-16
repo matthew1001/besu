@@ -445,16 +445,10 @@ public class BftMiningSoakTest extends ParameterizedBftTestBase {
     assertThat(authorizerCode).isEqualTo(expectedDelegationCode);
 
     // Osaka introduced the EIP-7825 per-transaction gas limit cap (16,777,216 gas). The Osaka
-    // genesis update set the BFT pertxgaslimit option to raise that cap, so a transaction above
-    // the Osaka default must be accepted and mined.
+    // genesis update set the BFT pertxgaslimit option to raise that cap
     LOG.info(
         "Submitting a {} gas transaction, above the default Osaka per-transaction cap of ~16.7M",
         LARGE_TX_GAS_LIMIT);
-    // Reuse the EIP-7702 sponsor account: it has sent exactly one transaction (the type-4
-    // transaction above, at nonce 0), so its nonce is now 1.
-    // The chain runs with zeroBaseFee, so the effective price of an EIP-1559 transaction is its
-    // priority fee; pay the nodes' min-gas-price floor (1000 wei), the same price the web3j
-    // contract wrappers in this test pay.
     final Transaction largeGasTx =
         Transaction.builder()
             .type(TransactionType.EIP1559)
@@ -481,7 +475,7 @@ public class BftMiningSoakTest extends ParameterizedBftTestBase {
     assertThat(largeGasTxReceipt).isPresent();
     assertThat(largeGasTxReceipt.get().getStatus()).isEqualTo("0x1");
 
-    // The override must raise the cap, not remove it: a transaction above pertxgaslimit is
+    // The override should raise the cap, not remove it, so a transaction above pertxgaslimit is
     // still rejected.
     LOG.info("Checking a transaction above the overridden per-transaction cap is still rejected");
     final Transaction overCapTx =
