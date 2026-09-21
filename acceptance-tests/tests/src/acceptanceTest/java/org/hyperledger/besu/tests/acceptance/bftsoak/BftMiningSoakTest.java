@@ -449,6 +449,13 @@ public class BftMiningSoakTest extends ParameterizedBftTestBase {
     LOG.info(
         "Submitting a {} gas transaction, above the default Osaka per-transaction cap of ~16.7M",
         LARGE_TX_GAS_LIMIT);
+    // A plain EOA recipient with no code. Deliberately NOT authorizerAddress: the EIP-7702 step
+    // above installed delegated code there, so an empty-calldata value transfer to it would
+    // execute the (non-payable) delegate contract and revert (receipt status 0x0) instead of
+    // performing a simple transfer. This transaction only needs to be a normal transaction whose
+    // gas limit exceeds the Osaka default cap, so a value transfer to an unused account suffices.
+    final Address largeTxRecipient =
+        Address.fromHexString("0x00000000000000000000000000000000000fa17e");
     final Transaction largeGasTx =
         Transaction.builder()
             .type(TransactionType.EIP1559)
@@ -457,7 +464,7 @@ public class BftMiningSoakTest extends ParameterizedBftTestBase {
             .maxPriorityFeePerGas(Wei.of(1000))
             .maxFeePerGas(Wei.of(1000))
             .gasLimit(LARGE_TX_GAS_LIMIT)
-            .to(authorizerAddress)
+            .to(largeTxRecipient)
             .value(Wei.of(1))
             .payload(Bytes.EMPTY)
             .accessList(List.of())
@@ -486,7 +493,7 @@ public class BftMiningSoakTest extends ParameterizedBftTestBase {
             .maxPriorityFeePerGas(Wei.of(1000))
             .maxFeePerGas(Wei.of(1000))
             .gasLimit(OSAKA_PER_TX_GAS_LIMIT_OVERRIDE + 1)
-            .to(authorizerAddress)
+            .to(largeTxRecipient)
             .value(Wei.of(1))
             .payload(Bytes.EMPTY)
             .accessList(List.of())
