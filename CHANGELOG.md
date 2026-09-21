@@ -48,6 +48,7 @@
 - Implement native `prestateTracer` execution tracing, reducing memory use for `debug_trace*`. [#11289](https://github.com/besu-eth/besu/pull/11289)
 - Upgrade the stable reference tests to `tests@v20.0.2`, now published from the `ethereum/execution-specs` repository. [#11175](https://github.com/besu-eth/besu/pull/11175)
 - `eth_simulate` now returns EIP-7708 transfer logs for Amsterdam [#11154](https://github.com/besu-eth/besu/pull/11154)
+- Update `Bouncycastle` to 1.85 to address CVEs `CVE-2026-8763` and `CVE-2026-13506`. [#11336](https://github.com/besu-eth/besu/pull/11336)
 
 ## 26.8.1
 
