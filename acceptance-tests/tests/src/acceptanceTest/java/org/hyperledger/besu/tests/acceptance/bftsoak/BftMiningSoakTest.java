@@ -534,7 +534,7 @@ public class BftMiningSoakTest extends ParameterizedBftTestBase {
 
     // Snap-sync regression check: a brand-new node must be able to snap-sync this QBFT/IBFT2 chain
     // and then serve historic block and transaction queries. We deliberately do NOT check historic
-    // state (eth_call/getBalance at old blocks) - that needs an archive node, which this is not.
+    // state (eth_call/getBalance at old blocks) - that needs an archive node.
     verifySnapSyncNodeRetrievesHistoricData(minerNode1, earlyContractDeployTxHash);
   }
 
