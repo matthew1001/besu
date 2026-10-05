@@ -18,12 +18,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import org.hyperledger.besu.consensus.qbft.core.types.QbftBlockValidator;
+import org.hyperledger.besu.datatypes.Hash;
+import org.hyperledger.besu.ethereum.BlockProcessingOutputs;
 import org.hyperledger.besu.ethereum.BlockProcessingResult;
 import org.hyperledger.besu.ethereum.BlockValidator;
 import org.hyperledger.besu.ethereum.ProtocolContext;
 import org.hyperledger.besu.ethereum.core.Block;
+import org.hyperledger.besu.ethereum.core.TransactionReceipt;
 import org.hyperledger.besu.ethereum.mainnet.HeaderValidationMode;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -37,6 +41,11 @@ class QbftBlockValidatorAdaptorTest {
   @Mock private ProtocolContext protocolContext;
   @Mock private Block besuBlock;
   @Mock private QbftBlockAdaptor qbftBlock;
+  @Mock private BlockProcessingOutputs processingOutputs;
+  @Mock private TransactionReceipt receipt;
+
+  private final ValidatedBlockProcessingCache validatedBlockCache =
+      new ValidatedBlockProcessingCache();
 
   @Test
   void validateSuccessfullyWhenBesuValidatorSuccessful() {
@@ -51,11 +60,42 @@ class QbftBlockValidatorAdaptorTest {
         .thenReturn(new BlockProcessingResult(Optional.empty()));
 
     QbftBlockValidatorAdaptor qbftBlockValidator =
-        new QbftBlockValidatorAdaptor(blockValidator, protocolContext);
+        new QbftBlockValidatorAdaptor(blockValidator, protocolContext, validatedBlockCache);
     QbftBlockValidator.ValidationResult validationResult =
         qbftBlockValidator.validateBlock(qbftBlock, Optional.empty());
     assertThat(validationResult.success()).isTrue();
     assertThat(validationResult.errorMessage()).isEmpty();
+  }
+
+  @Test
+  void successfulValidationCachesProcessingOutputsByBlockHash() {
+    final Hash blockHash = Hash.hash(org.apache.tuweni.bytes.Bytes.of(1));
+    final List<TransactionReceipt> receipts = List.of(receipt);
+    when(qbftBlock.getBesuBlock()).thenReturn(besuBlock);
+    when(besuBlock.getHash()).thenReturn(blockHash);
+    when(processingOutputs.getReceipts()).thenReturn(receipts);
+    when(processingOutputs.getBlockAccessList()).thenReturn(Optional.empty());
+    when(blockValidator.validateAndProcessBlock(
+            protocolContext,
+            besuBlock,
+            HeaderValidationMode.LIGHT,
+            HeaderValidationMode.FULL,
+            Optional.empty(),
+            false))
+        .thenReturn(new BlockProcessingResult(Optional.of(processingOutputs)));
+
+    QbftBlockValidatorAdaptor qbftBlockValidator =
+        new QbftBlockValidatorAdaptor(blockValidator, protocolContext, validatedBlockCache);
+    QbftBlockValidator.ValidationResult validationResult =
+        qbftBlockValidator.validateBlock(qbftBlock, Optional.empty());
+
+    assertThat(validationResult.success()).isTrue();
+    assertThat(validatedBlockCache.get(blockHash))
+        .hasValueSatisfying(
+            outputs -> {
+              assertThat(outputs.receipts()).isEqualTo(receipts);
+              assertThat(outputs.blockAccessList()).isEmpty();
+            });
   }
 
   @Test
@@ -71,7 +111,7 @@ class QbftBlockValidatorAdaptorTest {
         .thenReturn(new BlockProcessingResult("failed"));
 
     QbftBlockValidatorAdaptor qbftBlockValidator =
-        new QbftBlockValidatorAdaptor(blockValidator, protocolContext);
+        new QbftBlockValidatorAdaptor(blockValidator, protocolContext, validatedBlockCache);
     QbftBlockValidator.ValidationResult validationResult =
         qbftBlockValidator.validateBlock(qbftBlock, Optional.empty());
     assertThat(validationResult.success()).isFalse();

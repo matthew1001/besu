@@ -30,6 +30,11 @@ public class QbftProtocolScheduleAdaptor implements QbftProtocolSchedule {
   private final ProtocolSchedule besuProtocolSchedule;
   private final ProtocolContext context;
 
+  // Shared between the validator and importer adaptors: the validator records the outputs of
+  // executing each proposal so the importer can append the committed block without re-executing.
+  private final ValidatedBlockProcessingCache validatedBlockCache =
+      new ValidatedBlockProcessingCache();
+
   /**
    * Constructs a new Qbft protocol schedule.
    *
@@ -45,13 +50,13 @@ public class QbftProtocolScheduleAdaptor implements QbftProtocolSchedule {
   @Override
   public QbftBlockImporter getBlockImporter(final QbftBlockHeader header) {
     return new QbftBlockImporterAdaptor(
-        getProtocolSpecByBlockHeader(header).getBlockImporter(), context);
+        getProtocolSpecByBlockHeader(header).getBlockImporter(), context, validatedBlockCache);
   }
 
   @Override
   public QbftBlockValidator getBlockValidator(final QbftBlockHeader header) {
     return new QbftBlockValidatorAdaptor(
-        getProtocolSpecByBlockHeader(header).getBlockValidator(), context);
+        getProtocolSpecByBlockHeader(header).getBlockValidator(), context, validatedBlockCache);
   }
 
   private ProtocolSpec getProtocolSpecByBlockHeader(final QbftBlockHeader header) {
